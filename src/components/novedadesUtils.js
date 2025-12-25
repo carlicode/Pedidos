@@ -2,7 +2,7 @@
  * Utilidades para el modal de novedades
  */
 
-const NOVEDADES_KEY = 'pedidos_novedades_v1'
+const NOVEDADES_KEY = 'pedidos_novedades_v2'
 
 /**
  * Verifica si debe mostrarse el modal de novedades

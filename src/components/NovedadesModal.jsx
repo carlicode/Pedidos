@@ -20,6 +20,11 @@ const NovedadesModal = ({ onClose }) => {
 
   const novedades = [
     {
+      icon: 'clock',
+      title: 'Timer / Recordatorio',
+      description: '¡Nueva función! Ahora puedes usar el botón flotante ⏰ en la esquina inferior derecha para configurar un timer o recordatorio. Ingresa el tiempo (minutos y segundos) y un mensaje personalizado. El timer funcionará en segundo plano mientras trabajas, permitiéndote seguir agregando carreras, editando pedidos, etc. Cuando el tiempo se complete, verás una alerta con tu mensaje personalizado y escucharás una notificación sonora. ¡Perfecto para recordar llamadas, entregas importantes o cualquier tarea pendiente!'
+    },
+    {
       icon: 'dollarSign',
       title: 'Cotización Rápida de Carreras',
       description: '¡Nueva función! Ahora puedes usar el botón flotante 💰 en la esquina inferior derecha para abrir un modal de cotización rápida. Solo ingresa los puntos de recojo y entrega, selecciona el medio de transporte, y el sistema calculará automáticamente la distancia y el precio. Luego puedes hacer clic en "Crear carrera" para llenar automáticamente el formulario de pedido con esa información. ¡Perfecto para cotizar rápidamente sin llenar todo el formulario!'

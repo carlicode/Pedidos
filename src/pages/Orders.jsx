@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import Icon from '../components/Icon.jsx'
 import CotizacionModal from '../components/CotizacionModal.jsx'
+import TimerModal from '../components/TimerModal.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import Horarios from './Horarios.jsx'
 import PedidosClientes from '../components/PedidosClientes.jsx'
@@ -11,6 +12,7 @@ import Dashboard from './Dashboard.jsx'
 import InventarioAdmin from './InventarioAdmin.jsx'
 import { getBackendUrl, apiFetch, getApiUrl } from '../utils/api.js'
 import notificationSound from '../music/new-notification.mp3'
+import { useTimer } from '../hooks/useTimer.js'
 
 // ===== FUNCIONES AISLADAS PARA FECHAS Y HORAS BOLIVIANAS =====
 /**
@@ -1426,6 +1428,20 @@ export default function Orders() {
   
   // Estados para modal de cotización
   const [showCotizacionModal, setShowCotizacionModal] = useState(false)
+  // Estados para modal de timer
+  const [showTimerModal, setShowTimerModal] = useState(false)
+  
+  // Hook para el timer (funciona en segundo plano)
+  const {
+    tiempoRestante,
+    timerActivo,
+    mensajeTimer,
+    mostrarAlerta,
+    iniciarTimer,
+    detenerTimer,
+    cerrarAlerta,
+    formatearTiempo
+  } = useTimer()
   const [dataLoaded, setDataLoaded] = useState(false)
   const [deliveryModal, setDeliveryModal] = useState({ show: false, order: null })
   const [cancelModal, setCancelModal] = useState({ show: false, order: null })
@@ -1598,21 +1614,43 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     // Cambiar al tab de agregar pedido
     setActiveTab('agregar')
     
+    // Obtener nombres de recojo y entrega
+    const recojoNombre = datosCotizacion.recojo || ''
+    const entregaNombre = datosCotizacion.entrega || ''
+    
+    // Detectar si es una empresa válida (verificar si está en la lista de empresas)
+    // Si el array empresas está vacío, asumir que es empresa si:
+    // - Tiene un nombre y no es "Sin especificar"
+    // - Y no es una URL de maps
+    const esRecojoEmpresa = recojoNombre && 
+      recojoNombre !== 'Sin especificar' && 
+      !recojoNombre.toLowerCase().includes('maps') &&
+      !recojoNombre.toLowerCase().includes('goo.gl') &&
+      (empresas.length === 0 || empresas.some(emp => emp.empresa === recojoNombre))
+    
+    const esEntregaEmpresa = entregaNombre && 
+      entregaNombre !== 'Sin especificar' && 
+      !entregaNombre.toLowerCase().includes('maps') &&
+      !entregaNombre.toLowerCase().includes('goo.gl') &&
+      (empresas.length === 0 || empresas.some(emp => emp.empresa === entregaNombre))
+    
     // Auto-rellenar formulario con los datos de la cotización
     setForm(prev => ({
       ...prev,
-      recojo: 'Sin especificar',
-      entrega: 'Sin especificar',
-      direccion_recojo: datosCotizacion.direccion_recojo || '',
-      direccion_entrega: datosCotizacion.direccion_entrega || '',
+      recojo: recojoNombre || 'Sin especificar',
+      direccion_recojo: datosCotizacion.direccion_recojo || (esRecojoEmpresa && empresas.length > 0 ? getEmpresaMapa(recojoNombre) : ''),
+      entrega: entregaNombre || 'Sin especificar',
+      direccion_entrega: datosCotizacion.direccion_entrega || (esEntregaEmpresa && empresas.length > 0 ? getEmpresaMapa(entregaNombre) : ''),
       medio_transporte: datosCotizacion.medio_transporte || '',
       distancia_km: datosCotizacion.distancia_km || '',
       precio_bs: datosCotizacion.precio_bs || ''
     }))
     
-    // Activar modo manual para direcciones
-    setRecojoManual(true)
-    setEntregaManual(true)
+    // Activar modo según si es empresa o manual
+    // Si es una empresa válida, usar modo Empresas (recojoManual = false)
+    // Si no es empresa válida, usar modo Manual (recojoManual = true)
+    setRecojoManual(!esRecojoEmpresa)
+    setEntregaManual(!esEntregaEmpresa)
     setRecojoClienteAvisa(false)
     setEntregaClienteAvisa(false)
     
@@ -11971,40 +12009,78 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         </div>
       )}
 
-      {/* Botón flotante de Cotización */}
-      <button
-        onClick={() => setShowCotizacionModal(true)}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '64px',
-          height: '64px',
-          borderRadius: '50%',
-          backgroundColor: '#96c226',
-          color: 'white',
-          border: 'none',
-          boxShadow: '0 4px 12px rgba(150, 194, 38, 0.4)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '28px',
-          zIndex: 9999,
-          transition: 'all 0.3s ease',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.1)'
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(150, 194, 38, 0.6)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)'
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(150, 194, 38, 0.4)'
-        }}
-        title="Cotización rápida"
-      >
-        💰
-      </button>
+      {/* Botones flotantes */}
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        zIndex: 9999,
+      }}>
+        {/* Botón flotante de Timer */}
+        <button
+          onClick={() => setShowTimerModal(true)}
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.6)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)'
+          }}
+          title="Timer / Recordatorio"
+        >
+          ⏰
+        </button>
+
+        {/* Botón flotante de Cotización */}
+        <button
+          onClick={() => setShowCotizacionModal(true)}
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--brand)',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.6)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
+          }}
+          title="Cotización rápida"
+        >
+          💰
+        </button>
+      </div>
       
       {/* Modal de Cotización */}
       <CotizacionModal
@@ -12012,6 +12088,92 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         onClose={() => setShowCotizacionModal(false)}
         onCrearCarrera={handleCrearCarreraDesdeCotizacion}
       />
+
+      {/* Modal de Timer */}
+      <TimerModal
+        isOpen={showTimerModal}
+        onClose={() => setShowTimerModal(false)}
+        onIniciarTimer={iniciarTimer}
+        timerActivo={timerActivo}
+        tiempoRestante={tiempoRestante}
+        formatearTiempo={formatearTiempo}
+        onDetenerTimer={detenerTimer}
+        mensajeTimer={mensajeTimer}
+      />
+
+      {/* Alerta del Timer cuando llega el tiempo */}
+      {mostrarAlerta && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10002,
+            animation: 'fadeIn 0.3s ease',
+          }}
+          onClick={cerrarAlerta}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--panel)',
+              borderRadius: '16px',
+              padding: '40px',
+              maxWidth: '400px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              border: '3px solid var(--brand)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>
+              🔔
+            </div>
+            <h2
+              style={{
+                margin: '0 0 16px 0',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: 'var(--text)',
+              }}
+            >
+              Recordatorio
+            </h2>
+            <p
+              style={{
+                margin: '0 0 24px 0',
+                fontSize: '16px',
+                color: 'var(--text)',
+                lineHeight: '1.6',
+              }}
+            >
+              {mensajeTimer || '⏰ ¡Tiempo completado!'}
+            </p>
+            <button
+              onClick={cerrarAlerta}
+              style={{
+                padding: '12px 32px',
+                backgroundColor: 'var(--brand)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
