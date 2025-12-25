@@ -91,8 +91,8 @@ const HISTORIAL_SHEET_NAME = process.env.HISTORIAL_SHEET_NAME || 'Historial de p
 const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || ''
 const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-1d5503cf3b22.json'
 
-// API Key de Google Maps - intentar desde múltiples fuentes
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyDMKgCLNzX2g2SoKvKuChT4XtCct5b7JNs'
+// API Key de Google Maps - debe estar configurada en variables de entorno
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY
 
 // Debug: Mostrar todas las variables de entorno cargadas
 console.log('🔍 Variables de entorno cargadas:')
