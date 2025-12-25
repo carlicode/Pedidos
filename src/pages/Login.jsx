@@ -88,8 +88,8 @@ export default function Login() {
       
       const to = location.state?.from?.pathname || redirectPath
       
-      // Verificar si debe mostrarse el modal de novedades
-      if (shouldShowNovedades()) {
+      // Verificar si debe mostrarse el modal de novedades (solo para admins la primera vez)
+      if (userData.role === 'admin' && shouldShowNovedades()) {
         setPendingNavigation(to)
         setShowNovedades(true)
       } else {

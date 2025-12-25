@@ -72,7 +72,7 @@ const NovedadesModal = ({ onClose }) => {
     >
       <div
         style={{
-          backgroundColor: 'var(--bg-primary)',
+          backgroundColor: 'var(--panel)',
           borderRadius: '16px',
           maxWidth: '600px',
           width: '100%',
@@ -81,7 +81,7 @@ const NovedadesModal = ({ onClose }) => {
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
           transform: isVisible ? 'scale(1)' : 'scale(0.9)',
           transition: 'transform 0.3s ease',
-          border: '1px solid var(--border-color)',
+          border: '1px solid var(--border)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -165,7 +165,7 @@ const NovedadesModal = ({ onClose }) => {
           <p
             style={{
               fontSize: '16px',
-              color: 'var(--text-primary)',
+              color: 'var(--text)',
               marginBottom: '24px',
               lineHeight: '1.6',
             }}
@@ -216,7 +216,7 @@ const NovedadesModal = ({ onClose }) => {
                       margin: '0 0 8px 0',
                       fontSize: '18px',
                       fontWeight: '600',
-                      color: 'var(--text-primary)',
+                      color: 'var(--text)',
                     }}
                   >
                     {novedad.title}
@@ -225,7 +225,7 @@ const NovedadesModal = ({ onClose }) => {
                     style={{
                       margin: 0,
                       fontSize: '14px',
-                      color: 'var(--text-secondary)',
+                      color: 'var(--muted)',
                       lineHeight: '1.6',
                     }}
                   >
@@ -268,7 +268,7 @@ const NovedadesModal = ({ onClose }) => {
               style={{
                 margin: 0,
                 fontSize: '13px',
-                color: 'var(--text-secondary)',
+                color: 'var(--muted)',
                 flex: 1,
               }}
             >
@@ -281,7 +281,7 @@ const NovedadesModal = ({ onClose }) => {
         <div
           style={{
             padding: '20px 24px',
-            borderTop: '1px solid var(--border-color)',
+            borderTop: '1px solid var(--border)',
             display: 'flex',
             justifyContent: 'flex-end',
           }}

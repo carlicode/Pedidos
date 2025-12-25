@@ -5,6 +5,7 @@ import SearchableSelect from '../components/SearchableSelect.jsx'
 import Icon from '../components/Icon.jsx'
 import CotizacionModal from '../components/CotizacionModal.jsx'
 import TimerModal from '../components/TimerModal.jsx'
+import CerrarTurnoModal from '../components/CerrarTurnoModal.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import Horarios from './Horarios.jsx'
 import PedidosClientes from '../components/PedidosClientes.jsx'
@@ -1430,6 +1431,8 @@ export default function Orders() {
   const [showCotizacionModal, setShowCotizacionModal] = useState(false)
   // Estados para modal de timer
   const [showTimerModal, setShowTimerModal] = useState(false)
+  // Estados para modal de cerrar turno
+  const [showCerrarTurnoModal, setShowCerrarTurnoModal] = useState(false)
   
   // Hook para el timer (funciona en segundo plano)
   const {
@@ -12080,6 +12083,37 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         >
           💰
         </button>
+
+        {/* Botón flotante de Cerrar Turno */}
+        <button
+          onClick={() => setShowCerrarTurnoModal(true)}
+          style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            transition: 'all 0.3s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.6)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
+          }}
+          title="Cerrar turno"
+        >
+          📊
+        </button>
       </div>
       
       {/* Modal de Cotización */}
@@ -12100,6 +12134,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         onDetenerTimer={detenerTimer}
         mensajeTimer={mensajeTimer}
       />
+
+      {/* Modal de Cerrar Turno */}
+      {showCerrarTurnoModal && (
+        <CerrarTurnoModal
+          orders={orders}
+          operador={operadorDefault}
+          onClose={() => setShowCerrarTurnoModal(false)}
+        />
+      )}
 
       {/* Alerta del Timer cuando llega el tiempo */}
       {mostrarAlerta && (
