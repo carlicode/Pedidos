@@ -131,10 +131,6 @@ const initialOrder = {
 
 export default function Orders() {
   const { user, isAdmin } = useAuth()
-  
-  // Hook de logging
-  const { logToCSV, saveLogsToServer, clearLogs, getLogs } = useOrderLogging()
-  
   // Constantes ahora se importan desde orderConstants.js
 
   // No necesitamos cargar Google Maps JS, solo usamos la API HTTP
@@ -4805,6 +4801,81 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   const csvEscape = (v) => {
     const s = String(v ?? '')
     return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s
+  }
+
+  // Sistema de logging directo a CSV en el proyecto
+  const logToCSV = async (action, data, status = 'success', error = null) => {
+    try {
+      const timestamp = new Date().toISOString()
+      const logEntry = {
+        timestamp,
+        action,
+        status,
+        data: JSON.stringify(data),
+        error: error ? error.toString() : '',
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      }
+      
+      // Obtener logs existentes del localStorage
+      const existingLogs = localStorage.getItem('form_logs') || ''
+      const logsArray = existingLogs ? existingLogs.split('\n').filter(line => line.trim()) : []
+      
+      // Agregar nueva entrada
+      logsArray.push(JSON.stringify(logEntry))
+      
+      // Mantener máximo 1000 entradas
+      if (logsArray.length > 1000) {
+        logsArray.splice(0, logsArray.length - 1000)
+      }
+      
+      // Guardar en localStorage
+      localStorage.setItem('form_logs', logsArray.join('\n'))
+      
+      // Enviar logs al servidor para guardar en CSV
+      await saveLogsToServer(logsArray.map(log => JSON.parse(log)))
+
+    } catch (err) {
+
+    }
+  }
+
+  // Función para enviar logs al servidor
+  const saveLogsToServer = async (logs) => {
+    const result = await saveLogsAPI(logs)
+    return result
+  }
+
+  // Función para guardar logs en el proyecto
+  const downloadLogsCSV = async () => {
+    try {
+      const logs = localStorage.getItem('form_logs') || ''
+      if (!logs.trim()) {
+        showNotification('📝 No hay logs para guardar', 'info')
+      return
+    }
+    
+      // Convertir logs a array de objetos
+      const logsArray = logs.split('\n').filter(line => line.trim()).map(log => JSON.parse(log))
+      
+      // Enviar al servidor
+      await saveLogsToServer(logsArray)
+      showNotification('📄 Logs guardados en el proyecto exitosamente', 'success')
+    } catch (err) {
+
+      showNotification('❌ Error al guardar logs', 'error')
+    }
+  }
+
+  // Función para limpiar logs
+  const clearLogs = () => {
+    try {
+      localStorage.removeItem('form_logs')
+      showNotification('🗑️ Logs limpiados exitosamente', 'success')
+    } catch (err) {
+
+      showNotification('❌ Error al limpiar logs', 'error')
+    }
   }
 
   const loadOrdersFromSheet = async (forceReload = false) => {
