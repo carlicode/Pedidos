@@ -316,6 +316,192 @@ Este documento contiene todas las pruebas manuales necesarias para verificar que
 
 ---
 
+## 1️⃣4️⃣ Pruebas de Tercera Etapa - Componentes y Hooks Refactorizados
+
+### a) Componente EditOrderForm (EditOrderForm.jsx)
+
+#### Funcionalidad Básica de Edición:
+1. En **"Ver Pedidos"**, selecciona un pedido del Kanban
+2. Haz clic en el botón de **editar** (lápiz ✏️)
+3. ✅ **Esperado**: Se abre un modal con el formulario de edición completo
+4. Verifica que todos los campos se muestran con los valores actuales del pedido
+5. Modifica varios campos (ej: precio, biker, observaciones)
+6. Haz clic en **"✅ Guardar Cambios"**
+7. ✅ **Esperado**: 
+   - Mensaje "✅ Pedido actualizado en Google Sheet"
+   - Los cambios se reflejan inmediatamente en el Kanban
+   - El modal se cierra automáticamente
+
+#### Botón Cancelar:
+8. Abre el formulario de edición nuevamente
+9. Modifica algún campo
+10. Haz clic en **"❌ Cancelar"**
+11. ✅ **Esperado**: 
+    - El modal se cierra sin guardar cambios
+    - Los valores originales del pedido se mantienen
+
+#### Cálculo de Distancia en Edición:
+12. En el formulario de edición, modifica las direcciones de recojo o entrega
+13. Haz clic en el botón **"📏 Calcular"** junto a las direcciones
+14. ✅ **Esperado**: 
+    - Muestra notificación "🔄 Calculando distancia..."
+    - Luego muestra "📏 Distancia: X.XX km • 💰 Precio: X Bs"
+    - Los campos de distancia y precio se actualizan automáticamente
+
+#### Intercambiar Recojo y Entrega:
+15. En el formulario de edición, asegúrate de tener direcciones de recojo y entrega
+16. Haz clic en el botón **"⇅"** (intercambiar)
+17. ✅ **Esperado**: 
+    - Las direcciones de recojo y entrega se intercambian
+    - Los nombres también se intercambian
+    - La información adicional también se intercambia
+    - Si hay links válidos de Maps, se recalcula la distancia automáticamente
+
+#### Campos de Solo Lectura:
+18. En el formulario de edición, verifica la sección **"📋 Información de Registro"**
+19. ✅ **Esperado**: 
+    - ID, Fecha Registro, Hora Registro están deshabilitados (solo lectura)
+    - Estos campos tienen fondo gris y no se pueden editar
+
+#### Auto-llenado de Direcciones:
+20. En el formulario de edición, selecciona una empresa del dropdown de Recojo
+21. ✅ **Esperado**: La dirección (URL de Maps) se auto-completa automáticamente
+22. Repite con el campo de Entrega
+23. ✅ **Esperado**: Funciona igual para entrega
+
+---
+
+### b) Componente CancelOrderForm (CancelOrderForm.jsx)
+
+#### Cancelar Pedido:
+1. En **"Ver Pedidos"**, selecciona un pedido que no esté cancelado
+2. Haz clic en el botón **"🚫 Cancelar"**
+3. ✅ **Esperado**: Se abre un modal con:
+   - Información del pedido (cliente, ruta, biker, precio, estado)
+   - Campo de texto para motivo de cancelación
+   - Botones "❌ Cancelar" y "🚫 Confirmar Cancelación"
+
+#### Validación de Motivo:
+4. Deja el campo de motivo vacío
+5. Intenta confirmar la cancelación
+6. ✅ **Esperado**: 
+    - Muestra alerta "Por favor ingresa el motivo de la cancelación"
+    - No permite confirmar sin motivo
+
+#### Confirmar Cancelación:
+7. Ingresa un motivo de cancelación (ej: "Cliente canceló")
+8. Haz clic en **"🚫 Confirmar Cancelación"**
+9. ✅ **Esperado**: 
+    - El pedido se marca como cancelado
+    - El estado cambia a "Cancelado"
+    - El pedido se mueve a la columna correspondiente
+    - Mensaje de confirmación
+
+#### Botón Cancelar:
+10. Abre el modal de cancelación nuevamente
+11. Escribe un motivo
+12. Haz clic en **"❌ Cancelar"**
+13. ✅ **Esperado**: El modal se cierra sin cancelar el pedido
+
+---
+
+### c) Componente DeliveryOrderForm (DeliveryOrderForm.jsx)
+
+#### Completar Entrega:
+1. En **"Ver Pedidos"**, selecciona un pedido en estado **"En carrera"**
+2. Haz clic en el botón **"✅ Completar Entrega"**
+3. ✅ **Esperado**: Se abre un modal con:
+   - Información del pedido (editable)
+   - Campo de hora de finalización (requerido)
+   - Campo de observación interna
+   - Vista previa de la ruta completa
+
+#### Validación de Hora de Finalización:
+4. Deja el campo "Hora de Finalización" vacío
+5. Intenta completar la entrega
+6. ✅ **Esperado**: 
+    - Muestra alerta "Por favor ingresa la hora de finalización"
+    - No permite completar sin hora
+
+#### Campos Editables:
+7. En el formulario de entrega, modifica algún campo editable (cliente, recojo, entrega, biker, precio, distancia)
+8. ✅ **Esperado**: Todos los campos se pueden editar correctamente
+
+#### Seleccionar Medio de Transporte:
+9. En el formulario, cambia el medio de transporte usando el dropdown
+10. ✅ **Esperado**: 
+    - Muestra opciones: Bicicleta, Cargo, Scooter, Beezero
+    - El valor se guarda correctamente
+
+#### Limpiar Hora de Inicio:
+11. Si hay una hora de inicio, haz clic en el botón **"🗑️"** junto al campo
+12. ✅ **Esperado**: La hora de inicio se limpia
+
+#### Completar Entrega Exitosamente:
+13. Ingresa una hora de finalización válida (ej: 18:30)
+14. Opcionalmente, agrega una observación interna
+15. Haz clic en **"✅ Completar Entrega"**
+16. ✅ **Esperado**: 
+    - El pedido se marca como "Entregado"
+    - El pedido se mueve a la columna "Entregado"
+    - Se guarda la hora de finalización
+    - Mensaje de confirmación
+
+---
+
+### d) Hook useOrderLogging
+
+#### Logging de Acciones:
+1. Realiza varias acciones en la aplicación:
+   - Crea un nuevo pedido
+   - Edita un pedido
+   - Cancela un pedido
+   - Completa una entrega
+2. Abre la consola del navegador (F12)
+3. Busca en localStorage la clave `form_logs`
+4. ✅ **Esperado**: 
+    - Se guardan logs de todas las acciones realizadas
+    - Cada log contiene: timestamp, action, status, data, error, userAgent, url
+
+#### Verificar Estructura de Logs:
+5. En la consola, ejecuta: `localStorage.getItem('form_logs')`
+6. ✅ **Esperado**: 
+    - Los logs están en formato CSV
+    - Cada línea contiene información de una acción
+    - Los logs incluyen timestamps en formato ISO
+
+#### Límite de Logs:
+7. Realiza más de 1000 acciones (o simula usando código)
+8. ✅ **Esperado**: 
+    - Los logs se mantienen limitados a 1000 entradas
+    - Los logs más antiguos se eliminan automáticamente
+
+#### Envío al Servidor:
+9. Los logs se envían automáticamente al servidor cuando se guardan
+10. ✅ **Esperado**: 
+    - No hay errores en la consola relacionados con el envío de logs
+    - Los logs se almacenan en el servidor (verificar endpoint `/save-logs`)
+
+---
+
+### e) Helpers de Formulario (formHelpers.js)
+
+#### clearCobroPagoFields:
+1. En **"Agregar Pedido"**, selecciona un tipo de "Cobro" o "Pago"
+2. Ingresa un monto y descripción
+3. Luego deselecciona (deja vacío) el campo de "Cobro o Pago"
+4. ✅ **Esperado**: 
+    - Los campos "Monto Cobro o Pago" y "Descripción" se limpian automáticamente
+    - No quedan valores residuales
+
+#### getCurrentBoliviaDate:
+5. Crea un nuevo pedido sin modificar la fecha
+6. ✅ **Esperado**: 
+    - La fecha por defecto es la fecha actual en zona horaria Bolivia (UTC-4)
+    - La fecha está en formato YYYY-MM-DD (ISO)
+
+---
+
 ## 🚨 Errores Críticos a Verificar
 
 Si alguna de estas pruebas falla, revisar inmediatamente:
@@ -335,6 +521,11 @@ Si alguna de estas pruebas falla, revisar inmediatamente:
 | ❌ Links de Maps no se validan | Error en utilidades de Maps | `mapsUtils.validateGoogleMapsLink` |
 | ❌ Día de semana incorrecto | Error en cálculo de día | `dataHelpers.calculateDayOfWeek` |
 | ❌ Fechas mal formateadas | Error en formateo | `formatHelpers.formatDateForDisplay` |
+| ❌ Formulario de edición no funciona | Error en componente EditOrderForm | `components/forms/EditOrderForm.jsx` |
+| ❌ Formulario de cancelación no funciona | Error en componente CancelOrderForm | `components/forms/CancelOrderForm.jsx` |
+| ❌ Formulario de entrega no funciona | Error en componente DeliveryOrderForm | `components/forms/DeliveryOrderForm.jsx` |
+| ❌ Logs no se guardan | Error en hook de logging | `hooks/useOrderLogging.js` |
+| ❌ Campos de cobro/pago no se limpian | Error en helpers de formulario | `utils/formHelpers.js` |
 
 ---
 
@@ -417,6 +608,31 @@ Marca cada elemento después de probarlo:
 - [ ] Auto-completado de direcciones de empresas funciona
 - [ ] Cálculo automático de día de la semana funciona
 - [ ] Formateo de fechas para mostrar es correcto (DD/MM/YYYY)
+
+### Tercera Etapa - Componentes y Hooks
+- [ ] Formulario de edición (EditOrderForm) se abre correctamente
+- [ ] Campos del formulario de edición se muestran con valores actuales
+- [ ] Guardar cambios en edición funciona correctamente
+- [ ] Cancelar edición cierra el modal sin guardar
+- [ ] Cálculo de distancia funciona en formulario de edición
+- [ ] Intercambiar recojo y entrega funciona en edición
+- [ ] Campos de solo lectura en edición están deshabilitados
+- [ ] Auto-llenado de direcciones funciona en edición
+- [ ] Formulario de cancelación (CancelOrderForm) se abre correctamente
+- [ ] Validación de motivo de cancelación funciona
+- [ ] Confirmar cancelación funciona correctamente
+- [ ] Cancelar acción en formulario de cancelación funciona
+- [ ] Formulario de entrega (DeliveryOrderForm) se abre correctamente
+- [ ] Validación de hora de finalización funciona
+- [ ] Campos editables en formulario de entrega funcionan
+- [ ] Limpiar hora de inicio funciona
+- [ ] Completar entrega funciona correctamente
+- [ ] Hook useOrderLogging guarda logs correctamente
+- [ ] Logs se estructuran correctamente (timestamp, action, status, etc.)
+- [ ] Límite de 1000 logs funciona
+- [ ] Logs se envían al servidor correctamente
+- [ ] clearCobroPagoFields limpia campos cuando se deselecciona
+- [ ] getCurrentBoliviaDate retorna fecha correcta
 
 ---
 
@@ -504,8 +720,15 @@ Si encuentras problemas durante las pruebas:
    - `/src/utils/dataHelpers.js` - Helpers de datos
    - `/src/utils/formatHelpers.js` - Formateo de datos
 
+5. Revisa los archivos de la tercera etapa de refactorización:
+   - `/src/components/forms/EditOrderForm.jsx` - Formulario de edición de pedidos
+   - `/src/components/forms/CancelOrderForm.jsx` - Formulario de cancelación
+   - `/src/components/forms/DeliveryOrderForm.jsx` - Formulario de entrega
+   - `/src/hooks/useOrderLogging.js` - Hook de logging
+   - `/src/utils/formHelpers.js` - Helpers de formulario
+
 ---
 
-**Última actualización**: Diciembre 2025  
-**Versión de refactorización**: 2.0 - Extracción de Lógica de Negocio y Utilidades
+**Última actualización**: Enero 2025  
+**Versión de refactorización**: 3.0 - Extracción de Componentes, Hooks y Helpers
 
