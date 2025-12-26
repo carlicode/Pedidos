@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react'
+import HeatMapModal from '../components/HeatMapModal.jsx'
+import { useAuth } from '../hooks/useAuth.js'
 
 const Dashboard = ({ orders, loadOrdersFromSheet, showNotification }) => {
   const [dashboardData, setDashboardData] = useState(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [showHeatMapModal, setShowHeatMapModal] = useState(false)
+  const { user } = useAuth()
+  
+  // Verificar si el usuario actual es "carli"
+  const isCarli = user && user.username && user.username.toLowerCase() === 'carli'
 
   // Función helper para convertir minutos a formato horas:minutos:segundos
   const formatDuracion = (minutos) => {
@@ -343,19 +350,46 @@ const Dashboard = ({ orders, loadOrdersFromSheet, showNotification }) => {
         }}>
           📊 Dashboard Ejecutivo
         </h2>
-        <button
-          className="btn btn-primary"
-          onClick={calcularDashboard}
-          style={{
-            padding: '10px 20px',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            borderRadius: '8px'
-          }}
-        >
-          🔄 Actualizar
-        </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {isCarli && (
+                <button
+                  className="btn"
+                  onClick={() => setShowHeatMapModal(true)}
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗺️ Mapa de Calor
+                </button>
+              )}
+          <button
+            className="btn btn-primary"
+            onClick={calcularDashboard}
+            style={{
+              padding: '10px 20px',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              borderRadius: '8px'
+            }}
+          >
+            🔄 Actualizar
+          </button>
+        </div>
       </div>
+
+      {/* Modal de Mapa de Calor */}
+      <HeatMapModal
+        isOpen={showHeatMapModal}
+        onClose={() => setShowHeatMapModal(false)}
+        orders={orders}
+      />
 
       {loadingDashboard && (
         <div style={{

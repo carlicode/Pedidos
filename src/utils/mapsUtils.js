@@ -4,14 +4,76 @@
  */
 
 /**
- * Limpia una URL de Google Maps removiendo espacios y caracteres problemáticos
+ * Limpia y normaliza una URL de Google Maps removiendo espacios, caracteres problemáticos y URLs concatenadas
  * @param {string} url - URL a limpiar
- * @returns {string} URL limpia
+ * @returns {string} URL limpia y normalizada, o null si no es válida
  */
 export const cleanGoogleMapsUrl = (url) => {
-  if (!url || typeof url !== 'string') return url
-  // Limpiar espacios, paréntesis y otros caracteres problemáticos al inicio y final
-  return url.trim().replace(/^[\(\s]+|[\)\s]+$/g, '').trim()
+  if (!url || typeof url !== 'string') return null
+  
+  // Limpiar espacios al inicio y final
+  let urlLimpia = url.trim()
+  
+  // Remover paréntesis y espacios al inicio y final
+  urlLimpia = urlLimpia.replace(/^[\(\s]+|[\)\s]+$/g, '').trim()
+  
+  // Si está vacío después de limpiar, retornar null
+  if (!urlLimpia || urlLimpia === '') return null
+  
+  // Detectar URLs concatenadas (ej: https://maps.app.goo.gl/191https://maps.app.goo.gl/...)
+  // Buscar patrones de URLs de Google Maps
+  const patronesUrl = [
+    /https?:\/\/maps\.app\.goo\.gl\/[a-zA-Z0-9_-]+/g,
+    /https?:\/\/goo\.gl\/maps\/[a-zA-Z0-9_-]+/g,
+    /https?:\/\/www\.google\.com\/maps\/[^\s\)]+/g,
+    /https?:\/\/maps\.google\.com\/[^\s\)]+/g,
+    /https?:\/\/google\.com\/maps\/[^\s\)]+/g,
+    /https?:\/\/google\.com\.bo\/maps\/[^\s\)]+/g
+  ]
+  
+  const urlsEncontradas = []
+  patronesUrl.forEach(patron => {
+    const matches = urlLimpia.match(patron)
+    if (matches) {
+      urlsEncontradas.push(...matches)
+    }
+  })
+  
+  // Si encontramos URLs válidas, usar la primera completa
+  if (urlsEncontradas.length > 0) {
+    const urlSeleccionada = urlsEncontradas[0]
+    
+    // Verificar si la URL está malformada (tiene otra URL dentro)
+    if (urlSeleccionada.includes('https://') && urlSeleccionada.split('https://').length > 2) {
+      // Extraer solo la primera URL completa
+      const partes = urlSeleccionada.split('https://')
+      if (partes.length > 1) {
+        const primeraUrl = 'https://' + partes[1]
+        const matchPrimera = primeraUrl.match(/https?:\/\/[^\s\)]+/)
+        if (matchPrimera) {
+          return matchPrimera[0].trim()
+        }
+      }
+    }
+    
+    return urlSeleccionada.trim()
+  }
+  
+  // Si no encontramos patrón válido pero parece una URL de maps, intentar limpiar
+  if (urlLimpia.includes('maps.app.goo.gl') || urlLimpia.includes('goo.gl/maps') || urlLimpia.includes('google.com/maps')) {
+    // Intentar extraer la parte válida antes del primer espacio o paréntesis
+    const match = urlLimpia.match(/https?:\/\/[^\s\)]+/)
+    if (match) {
+      return match[0].trim()
+    }
+  }
+  
+  // Si no parece una URL de Google Maps, retornar null
+  if (!urlLimpia.includes('maps') && !urlLimpia.includes('goo.gl')) {
+    return null
+  }
+  
+  return urlLimpia
 }
 
 /**

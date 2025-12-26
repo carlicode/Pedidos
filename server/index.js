@@ -3612,6 +3612,91 @@ app.post('/api/cliente/crear-pedido', async (req, res) => {
  * Endpoint para cancelar un pedido de cliente
  * Actualiza el estado a "CANCELADO" en Google Sheets
  */
+/**
+ * Endpoint para obtener la API key de Google Maps (solo para uso en frontend)
+ */
+app.get('/api/maps/api-key', async (req, res) => {
+  try {
+    // Devolver la API key para uso en el frontend
+    // NOTA: En producción, esto debería estar restringido por dominio
+    res.json({
+      apiKey: GOOGLE_MAPS_API_KEY || ''
+    })
+  } catch (error) {
+    console.error('❌ Error obteniendo API key:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo API key'
+    })
+  }
+})
+
+/**
+ * Endpoint para convertir URLs de Google Maps a coordenadas
+ * Recibe un array de URLs y devuelve un array de coordenadas {lat, lng}
+ */
+app.post('/api/maps/urls-to-coordinates', async (req, res) => {
+  try {
+    const { urls } = req.body
+    
+    if (!urls || !Array.isArray(urls)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere un array de URLs'
+      })
+    }
+    
+    console.log(`\n🗺️ Convirtiendo ${urls.length} URLs a coordenadas`)
+    
+    const coordinates = []
+    
+    for (const url of urls) {
+      if (!url || url.trim() === '' || url === 'Cliente avisa') {
+        coordinates.push(null)
+        continue
+      }
+      
+      try {
+        const coordsStr = await expandUrlAndExtractCoords(url.trim())
+        
+        // Si es un formato "lat,lng", parsearlo
+        if (coordsStr && /^-?\d+\.\d+,-?\d+\.\d+$/.test(coordsStr)) {
+          const [lat, lng] = coordsStr.split(',').map(Number)
+          coordinates.push({ lat, lng })
+        } else {
+          // Si no son coordenadas directas, intentar geocoding
+          const geocoded = await geocodeLocation(coordsStr || url)
+          if (geocoded && /^-?\d+\.\d+,-?\d+\.\d+$/.test(geocoded)) {
+            const [lat, lng] = geocoded.split(',').map(Number)
+            coordinates.push({ lat, lng })
+          } else {
+            coordinates.push(null)
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error procesando URL ${url}:`, error.message)
+        coordinates.push(null)
+      }
+    }
+    
+    const validCoords = coordinates.filter(c => c !== null)
+    console.log(`✅ ${validCoords.length}/${urls.length} URLs convertidas exitosamente`)
+    
+    res.json({
+      success: true,
+      coordinates
+    })
+    
+  } catch (error) {
+    console.error('❌ Error convirtiendo URLs a coordenadas:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error convirtiendo URLs a coordenadas',
+      details: error.message
+    })
+  }
+})
+
 app.post('/api/cliente/cancelar-pedido', async (req, res) => {
   try {
     const { idPedido } = req.body
