@@ -14,138 +14,74 @@ import InventarioAdmin from './InventarioAdmin.jsx'
 import { getBackendUrl, apiFetch, getApiUrl } from '../utils/api.js'
 import notificationSound from '../music/new-notification.mp3'
 import { useTimer } from '../hooks/useTimer.js'
+import { 
+  getBoliviaTime, 
+  getBoliviaDateTime, 
+  getBoliviaDateISO, 
+  getBoliviaTimeString, 
+  getCurrentBoliviaTime, 
+  formatCurrency,
+  toMinutes,
+  mergeTimeSlots,
+  getDayInitial 
+} from '../utils/dateUtils.js'
+import {
+  saveOrderToSheet,
+  updateOrderInSheet as updateOrderInSheetAPI,
+  loadOrdersFromSheet as loadOrdersAPI,
+  saveLogsToServer as saveLogsAPI,
+  getNextId,
+  mapRowToOrder,
+  filterOrderForSheet
+} from '../services/ordersService.js'
+import {
+  loadClientes as loadClientesAPI,
+  loadEmpresas as loadEmpresasAPI,
+  addEmpresa as addEmpresaAPI,
+  calculateCobrosPagos,
+  filtrarPedidosPorFecha
+} from '../services/clientesService.js'
+import {
+  loadBikersForAgregar as loadBikersForAgregarAPI,
+  loadBikersAgregar as loadBikersAgregarAPI,
+  loadBikersForCuentas as loadBikersForCuentasAPI,
+  addBiker as addBikerAPI,
+  calcularCuentasBiker as calcularCuentasBikerAPI
+} from '../services/bikersService.js'
+import {
+  filtrarPedidosParaPDF,
+  calcularTotalesResumen,
+  calcularTotalConDescuento
+} from '../services/reportsService.js'
+import {
+  METODOS_PAGO,
+  ESTADOS_PAGO,
+  MEDIOS_TRANSPORTE,
+  ESTADOS,
+  TIPOS_COBRO_PAGO,
+  SERVICIOS,
+  DIAS_SEMANA,
+  DISTANCE_BUFFER_KM
+} from '../constants/orderConstants.js'
+import {
+  cleanGoogleMapsUrl,
+  generateGoogleMapsLink,
+  isGoogleMapsLink,
+  hasValidMapsLink,
+  validateGoogleMapsLink
+} from '../utils/mapsUtils.js'
+import { calculatePrice } from '../utils/priceCalculator.js'
+import { calculateDistance } from '../utils/distanceCalculator.js'
+import { validateForm } from '../utils/formValidator.js'
+import {
+  getEmpresaMapa,
+  getClienteInfo,
+  calculateDayOfWeek
+} from '../utils/dataHelpers.js'
+import { formatDateForDisplay } from '../utils/formatHelpers.js'
 
-// ===== FUNCIONES AISLADAS PARA FECHAS Y HORAS BOLIVIANAS =====
-/**
- * Obtiene la fecha y hora actual en zona horaria de Bolivia (UTC-4)
- * @returns {Date} Fecha ajustada a Bolivia
- */
-const getBoliviaTime = () => {
-  const now = new Date()
-  const boliviaOffset = -4 * 60 // -4 horas en minutos
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-  return new Date(utc + (boliviaOffset * 60000))
-}
-
-/**
- * Genera fecha y hora en formato boliviano (UTC-4) para registro de pedidos
- * @returns {Object} Objeto con fechaRegistro y horaRegistro formateados
- */
-const getBoliviaDateTime = () => {
-  const boliviaTime = getBoliviaTime()
-  
-  // Formatear fecha como DD/MM/YYYY
-  const dia = String(boliviaTime.getDate()).padStart(2, '0')
-  const mes = String(boliviaTime.getMonth() + 1).padStart(2, '0')
-  const año = boliviaTime.getFullYear()
-  const fechaRegistro = `${dia}/${mes}/${año}`
-  
-  // Formatear hora como HH:MM:SS
-  const horas = String(boliviaTime.getHours()).padStart(2, '0')
-  const minutos = String(boliviaTime.getMinutes()).padStart(2, '0')
-  const segundos = String(boliviaTime.getSeconds()).padStart(2, '0')
-  const horaRegistro = `${horas}:${minutos}:${segundos}`
-  
-  return {
-    fechaRegistro,
-    horaRegistro,
-    boliviaTime
-  }
-}
-
-/**
- * Obtiene la fecha actual de Bolivia en formato YYYY-MM-DD para filtros
- * @returns {string} Fecha en formato YYYY-MM-DD
- */
-const getBoliviaDateISO = () => {
-  const boliviaTime = getBoliviaTime()
-  const year = boliviaTime.getFullYear()
-  const month = String(boliviaTime.getMonth() + 1).padStart(2, '0')
-  const day = String(boliviaTime.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-/**
- * Obtiene la hora actual de Bolivia en formato HH:MM
- * @returns {string} Hora en formato HH:MM
- */
-const getBoliviaTimeString = () => {
-  const boliviaTime = getBoliviaTime()
-  const hours = String(boliviaTime.getHours()).padStart(2, '0')
-  const minutes = String(boliviaTime.getMinutes()).padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-/**
- * Obtiene la hora actual de Bolivia en formato HH:MM para campos de hora por defecto
- * @returns {string} Hora actual en formato HH:MM (zona horaria Bolivia UTC-4)
- */
-const getCurrentBoliviaTime = () => {
-  const boliviaTime = getBoliviaTime()
-  const hours = String(boliviaTime.getHours()).padStart(2, '0')
-  const minutes = String(boliviaTime.getMinutes()).padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-/**
- * Formatea un número con separadores de miles y decimales
- * @param {number} value - Valor numérico a formatear
- * @param {number} decimals - Número de decimales (default: 2)
- * @returns {string} Número formateado (ej: "1,234.56")
- */
-const formatCurrency = (value, decimals = 2) => {
-  if (value === null || value === undefined || isNaN(value)) return '0.00'
-  return parseFloat(value).toLocaleString('es-BO', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  })
-}
-
-const toMinutes = (time) => {
-  if (!time) return null
-  const [hour, minute] = time.split(':').map(Number)
-  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
-  return hour * 60 + minute
-}
-
-const mergeTimeSlots = (slots = []) => {
-  if (!slots.length) return []
-  const parsed = slots
-    .map(slot => {
-      const [startRaw, endRaw] = slot.split('-')
-      const start = startRaw?.trim()
-      const end = endRaw?.trim()
-      return {
-        start,
-        end,
-        startMinutes: toMinutes(start),
-        endMinutes: toMinutes(end)
-      }
-    })
-    .filter(item => item.startMinutes !== null && item.endMinutes !== null)
-    .sort((a, b) => a.startMinutes - b.startMinutes)
-
-  if (!parsed.length) return []
-
-  const merged = [parsed[0]]
-  for (let i = 1; i < parsed.length; i++) {
-    const current = merged[merged.length - 1]
-    const next = parsed[i]
-    if (current.endMinutes === next.startMinutes) {
-      current.end = next.end
-      current.endMinutes = next.endMinutes
-    } else {
-      merged.push(next)
-    }
-  }
-
-  return merged.map(item => `${item.start}-${item.end}`)
-}
-
-const getDayInitial = (dayName = '') => {
-  if (typeof dayName !== 'string') return ''
-  return dayName.trim().charAt(0).toUpperCase()
-}
+// ===== FUNCIONES DE UTILIDAD MOVIDAS A dateUtils.js =====
+// Las funciones de fecha y hora boliviana ahora se importan desde ../utils/dateUtils.js
 
 // Componente simple para el formulario de edición
 const EditForm = ({ order, onComplete, onCancel, currentUser }) => {
@@ -244,7 +180,7 @@ const EditForm = ({ order, onComplete, onCancel, currentUser }) => {
 
     showNotification('🔄 Calculando distancia...', 'success')
     try {
-      const distance = await calculateDistance(cleanRecojo, cleanEntrega)
+      const distance = await calculateDistanceWrapper(cleanRecojo, cleanEntrega)
       
       if (distance !== null && distance > 0) {
 
@@ -1149,22 +1085,7 @@ const DeliveryForm = ({ order, onComplete, onCancel }) => {
 }
 
 // Función para calcular el día de la semana en zona horaria Bolivia
-const calculateDayOfWeek = (dateString) => {
-  if (!dateString) return ''
-  
-  // Crear fecha sin problemas de zona horaria
-  // Si viene en formato YYYY-MM-DD, parsear manualmente
-  let fecha
-  if (dateString.includes('-')) {
-    const [year, month, day] = dateString.split('-')
-    fecha = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-  } else {
-    fecha = new Date(dateString)
-  }
-  
-  const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  return diasSemana[fecha.getDay()]
-}
+// calculateDayOfWeek ahora se importa desde dataHelpers.js
 
 const initialOrder = {
   fecha: getBoliviaDateISO(), // Fecha de hoy por defecto en zona horaria Bolivia
@@ -1204,16 +1125,7 @@ const initialOrder = {
 
 export default function Orders() {
   const { user, isAdmin } = useAuth()
-  const METODOS_PAGO = ['Efectivo', 'Cuenta', 'A cuenta', 'QR', 'Cortesía']
-  const ESTADOS_PAGO = ['Debe Cliente', 'Pagado', 'QR Verificado', 'Debe Biker', 'Error Admin', 'Error Biker', 'Espera', 'Sin Biker']
-  const MEDIOS_TRANSPORTE = ['Bicicleta', 'Cargo', 'Scooter', 'Beezero']
-  const ESTADOS = ['Pendiente', 'En carrera', 'Entregado', 'Cancelado']
-  const TIPOS_COBRO_PAGO = ['', 'Cobro', 'Pago']
-  const SERVICIOS = ['Beezy', 'Bee Zero']
-  const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
-  
-  // Buffer de distancia: 0.25 cuadras = 25 metros = 0.025 km
-  const DISTANCE_BUFFER_KM = 0.025
+  // Constantes ahora se importan desde orderConstants.js
 
   // No necesitamos cargar Google Maps JS, solo usamos la API HTTP
 
@@ -1248,21 +1160,10 @@ export default function Orders() {
   // Función para cargar empresas desde Google Sheets
   const loadEmpresas = async () => {
     try {
-      const csvUrl = import.meta.env.VITE_EMPRESAS_CSV_URL
-      if (!csvUrl) {
-
-        return
-      }
-
-      const response = await fetch(csvUrl)
-      const csvText = await response.text()
-      
-      const parsedData = Papa.parse(csvText, { header: true, skipEmptyLines: true })
-
-      setEmpresasAgregar(parsedData.data)
-      showNotification(`🏢 ${parsedData.data.length} empresas cargadas`, 'success')
+      const data = await loadEmpresasAPI()
+      setEmpresasAgregar(data)
+      showNotification(`🏢 ${data.length} empresas cargadas`, 'success')
     } catch (error) {
-
       showNotification('❌ Error cargando empresas', 'error')
     }
   }
@@ -1270,21 +1171,10 @@ export default function Orders() {
   // Función para cargar bikers desde Google Sheets para Agregar Nuevo
   const loadBikersAgregar = async () => {
     try {
-      const csvUrl = import.meta.env.VITE_BIKERS_CSV_URL
-      if (!csvUrl) {
-
-        return
-      }
-
-      const response = await fetch(csvUrl)
-      const csvText = await response.text()
-      
-      const parsedData = Papa.parse(csvText, { header: true, skipEmptyLines: true })
-
-      setBikersAgregarNuevo(parsedData.data)
-      showNotification(`🚴‍♂️ ${parsedData.data.length} bikers cargados`, 'success')
+      const data = await loadBikersAgregarAPI()
+      setBikersAgregarNuevo(data)
+      showNotification(`🚴‍♂️ ${data.length} bikers cargados`, 'success')
     } catch (error) {
-
       showNotification('❌ Error cargando bikers', 'error')
     }
   }
@@ -1294,38 +1184,7 @@ export default function Orders() {
     e.preventDefault()
     
     try {
-      // Validar campos requeridos
-      if (!nuevaEmpresa.empresa || !nuevaEmpresa.descripcion) {
-        showNotification('❌ Empresa y Descripción son campos requeridos', 'error')
-        return
-      }
-
-      // Siempre usar la fecha actual de Bolivia (fecha del día que se registra el pedido)
-      const { fechaRegistro } = getBoliviaDateTime()
-      const fecha = fechaRegistro
-
-      // Obtener operador actual si no se proporcionó
-      const operador = nuevaEmpresa.operador || operadorDefault
-
-      // Preparar datos para enviar al servidor en el orden: Fecha, Operador, Empresa, Mapa, Descripción
-      const empresaData = {
-        'Fecha': fecha,
-        'Operador': operador,
-        'Empresa': nuevaEmpresa.empresa,
-        'Mapa': nuevaEmpresa.mapa || '',
-        'Descripción': nuevaEmpresa.descripcion
-      }
-
-      // Enviar al servidor
-      const response = await apiFetch('/api/empresas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(empresaData)
-      })
-
-      if (response.ok) {
+      await addEmpresaAPI(nuevaEmpresa, operadorDefault)
         showNotification('✅ Empresa agregada exitosamente', 'success')
         setNuevaEmpresa({
           operador: '',
@@ -1335,12 +1194,8 @@ export default function Orders() {
         })
         // Recargar empresas
         loadEmpresas()
-      } else {
-        throw new Error('Error del servidor')
-      }
     } catch (error) {
-
-      showNotification('❌ Error agregando empresa', 'error')
+      showNotification(`❌ ${error.message}`, 'error')
     }
   }
 
@@ -1349,28 +1204,7 @@ export default function Orders() {
     e.preventDefault()
     
     try {
-      // Validar campos requeridos
-      if (!nuevoBiker.biker || !nuevoBiker.whatsapp) {
-        showNotification('❌ Biker y WhatsApp son campos requeridos', 'error')
-        return
-      }
-
-      // Preparar datos para enviar al servidor
-      const bikerData = {
-        'Biker': nuevoBiker.biker,
-        'Whatsapp': nuevoBiker.whatsapp
-      }
-
-      // Enviar al servidor (necesitarás crear un endpoint específico para bikers)
-      const response = await apiFetch('/api/bikers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bikerData)
-      })
-
-      if (response.ok) {
+      await addBikerAPI(nuevoBiker)
         showNotification('✅ Biker agregado exitosamente', 'success')
         setNuevoBiker({
           biker: '',
@@ -1378,12 +1212,8 @@ export default function Orders() {
         })
         // Recargar bikers
         loadBikersAgregar()
-      } else {
-        throw new Error('Error del servidor')
-      }
     } catch (error) {
-
-      showNotification('❌ Error agregando biker', 'error')
+      showNotification(`❌ ${error.message}`, 'error')
     }
   }
 
@@ -1643,7 +1473,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       recojo: recojoNombre || 'Sin especificar',
       direccion_recojo: datosCotizacion.direccion_recojo || (esRecojoEmpresa && empresas.length > 0 ? getEmpresaMapa(recojoNombre) : ''),
       entrega: entregaNombre || 'Sin especificar',
-      direccion_entrega: datosCotizacion.direccion_entrega || (esEntregaEmpresa && empresas.length > 0 ? getEmpresaMapa(entregaNombre) : ''),
+      direccion_entrega: datosCotizacion.direccion_entrega || (esEntregaEmpresa && empresas.length > 0 ? getEmpresaMapa(entregaNombre, empresas) : ''),
       medio_transporte: datosCotizacion.medio_transporte || '',
       distancia_km: datosCotizacion.distancia_km || '',
       precio_bs: datosCotizacion.precio_bs || ''
@@ -1685,17 +1515,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   ])
 
   // Función para detectar si un valor es un enlace válido de Google Maps
-  const hasValidMapsLink = (direccion) => {
-    if (!direccion || typeof direccion !== 'string') return false
-    const trimmed = direccion.trim()
-    // Detectar varios formatos de enlaces de Google Maps
-    return (
-      trimmed.includes('maps.app.goo.gl') ||
-      trimmed.includes('goo.gl/maps') ||
-      trimmed.includes('maps.google.com') ||
-      trimmed.includes('google.com/maps')
-    ) && trimmed !== 'Cliente avisa'
-  }
+  // hasValidMapsLink ahora se importa desde mapsUtils.js
 
   // Función para detectar automáticamente el modo de entrada basado en el valor actual
   // Si hay mapas en la dirección, DEBE ser Manual (no puede ser Cliente avisa)
@@ -2045,23 +1865,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   // Función para validar enlaces de Google Maps
-  const validateGoogleMapsLink = (url) => {
-    if (!url || url.trim() === '') return true // Permitir campos vacíos
-    
-    const trimmedUrl = url.trim()
-    
-    // Patrones válidos de Google Maps:
-    // 1. https://maps.app.goo.gl/xxxxx (enlaces cortos)
-    // 2. https://www.google.com/maps/place/... (enlaces completos)
-    // 3. También aceptar con @ al inicio como en el ejemplo
-    const validPatterns = [
-      /^@?https:\/\/maps\.app\.goo\.gl\/[a-zA-Z0-9_-]+/,
-      /^@?https:\/\/www\.google\.com\/maps\/place\/.+/,
-      /^@?https:\/\/maps\.google\.com\/.*\/@-?\d+\.\d+,-?\d+\.\d+/
-    ]
-    
-    return validPatterns.some(pattern => pattern.test(trimmedUrl))
-  }
+  // validateGoogleMapsLink ahora se importa desde mapsUtils.js
 
   // Función para manejar la selección de fechas en el calendario
   const handleCalendarDateSelect = (dateString) => {
@@ -2565,51 +2369,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   const loadClientes = async () => {
     try {
-      const csvUrl = import.meta.env.VITE_EMPRESAS_CSV_URL || import.meta.env.VITE_CLIENTES_CSV_URL
-      if (!csvUrl) {
-
-        return
-      }
-      
       showNotification('🔄 Cargando clientes...', 'success')
       
-      const res = await fetch(csvUrl, { 
-        cache: 'no-store',
-        mode: 'cors',
-        headers: {
-          'Accept': 'text/csv'
-        }
-      })
-      if (!res.ok) {
-
-        showNotification('⚠️ No se pudieron cargar los clientes', 'error')
-        return
-      }
-      
-      const csvText = await res.text()
-      const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
-      
-      // Cargar empresas con sus mapas para Recojo/Entrega
-      const empresasData = parsed.data
-        .filter(row => row.Empresa?.trim() && row.Mapa?.trim())
-        .map(row => ({
-          empresa: row.Empresa.trim(),
-          mapa: row.Mapa.trim(),
-          descripcion: row.Descripción?.trim() || ''
-        }))
+      const { empresas: empresasData, clientes: clientesData } = await loadClientesAPI()
       
       setEmpresas(empresasData)
-      
-      // Cargar solo nombres de empresas para Cliente
-      const empresasNombres = parsed.data
-        .map(row => row.Empresa?.trim())
-        .filter(empresa => empresa && empresa.length > 0)
-        .sort()
-      
-      setClientes([...new Set(empresasNombres)]) // Remover duplicados
-      showNotification(`👥 ${empresasNombres.length} clientes cargados`, 'success')
+      setClientes(clientesData)
+      showNotification(`👥 ${clientesData.length} clientes cargados`, 'success')
     } catch (error) {
-
       showNotification('⚠️ Error al cargar clientes. Usando datos locales.', 'error')
       // No fallar completamente, continuar con datos vacíos
     }
@@ -3774,31 +3541,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     try {
       setLoadingCuentasBiker(true)
 
-      // Extraer bikers únicos de los pedidos cargados (excluyendo "ASIGNAR BIKER" y cancelados)
-      const bikersSet = new Set()
-      
-      orders.forEach(order => {
-        const bikerName = order['Biker'] || order.biker
-        const operadorName = order['Operador'] || order.operador
-        const estado = order['Estado'] || order.estado
-        
-        // Excluir pedidos cancelados y "ASIGNAR BIKER"
-        if (estado === 'Cancelado') return
-        
-        if (bikerName && bikerName.trim() && bikerName !== 'N/A' && bikerName !== 'ASIGNAR BIKER') {
-          bikersSet.add(bikerName.trim())
-        }
-        if (operadorName && operadorName.trim() && operadorName !== 'N/A' && operadorName !== 'ASIGNAR BIKER') {
-          bikersSet.add(operadorName.trim())
-        }
-      })
-      
-      const bikersData = Array.from(bikersSet)
-        .map((nombre, index) => ({
-          id: `biker-${index}`,
-          nombre: nombre
-        }))
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      const bikersData = loadBikersForCuentasAPI(orders)
       
       setBikersCuentas(bikersData)
       resolve(bikersData)
@@ -4080,84 +3823,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   const loadCobrosPagos = async () => {
     try {
-
-      // Agrupar TODOS los pedidos por cliente
-      const clientesData = {}
-      
-      orders.forEach(pedido => {
-        const cliente = pedido.cliente || 'Sin Cliente'
-        
-        if (!clientesData[cliente]) {
-          clientesData[cliente] = {
-            cliente: cliente,
-            totalCobros: 0,      // Lo que el cliente nos debe pagar (adicional a carreras)
-            totalPagos: 0,       // Lo que el cliente ya pagó
-            totalCarreras: 0,    // Valor total de todas las carreras realizadas
-            saldoFinal: 0,       // Balance final (carreras + cobros - pagos)
-            pedidos: [],         // Todos los pedidos del cliente
-            cobrosExtras: [],    // Solo pedidos con cobros adicionales
-            pagosRealizados: []  // Solo pedidos con pagos
-          }
-        }
-        
-        // Agregar el pedido a la lista del cliente
-        clientesData[cliente].pedidos.push(pedido)
-        
-        // Sumar el precio de la carrera (siempre se suma)
-        const precioCarrera = parseFloat(pedido.precio_bs) || 0
-        clientesData[cliente].totalCarreras += precioCarrera
-        
-        // Procesar cobros y pagos adicionales si existen
-        if (pedido.cobro_pago && pedido.cobro_pago.trim() !== '') {
-          const monto = parseFloat(pedido.monto_cobro_pago) || 0
-        
-        if (pedido.cobro_pago === 'Cobro') {
-            clientesData[cliente].totalCobros += monto
-            clientesData[cliente].cobrosExtras.push({
-              id: pedido.id,
-              fecha: pedido.fecha,
-              monto: monto,
-              descripcion: pedido.observaciones || 'Cobro adicional'
-            })
-        } else if (pedido.cobro_pago === 'Pago') {
-            clientesData[cliente].totalPagos += monto
-            clientesData[cliente].pagosRealizados.push({
-              id: pedido.id,
-              fecha: pedido.fecha,
-              monto: monto,
-              descripcion: pedido.observaciones || 'Pago realizado'
-            })
-          }
-        }
-      })
-      
-      // Calcular saldo final para cada cliente
-      Object.values(clientesData).forEach(cliente => {
-        // Calcular subtotal general sin descuento
-        // Subtotal General = Carreras + Pagos - Cobros
-        // Cobros: dinero que cobramos del cliente (se debe devolver) → se resta
-        // Pagos: dinero que pagamos en nombre del cliente (se debe cobrar) → se suma
-        // Carreras: precio del servicio (se debe cobrar) → se suma
-        const subtotalGeneral = cliente.totalCarreras + cliente.totalPagos - cliente.totalCobros
-        // Aplicar descuento solo a las carreras (como porcentaje)
-        const porcentajeDescuento = descuentosClientes[cliente.cliente] || 0
-        const montoDescuento = (cliente.totalCarreras * porcentajeDescuento) / 100
-        // Saldo final con descuento aplicado solo a las carreras
-        cliente.saldoFinal = subtotalGeneral - montoDescuento
-      })
-
-      Object.values(clientesData).forEach(cliente => {
-      })
-      
-      // Filtrar solo clientes que tienen actividad (carreras, cobros o pagos)
-      const clientesConActividad = Object.values(clientesData).filter(cliente => 
-        cliente.totalCarreras > 0 || cliente.totalCobros > 0 || cliente.totalPagos > 0
-      )
-      
+      const clientesConActividad = calculateCobrosPagos(orders, descuentosClientes)
       setCobrosPagosData(clientesConActividad)
-
       showNotification(`💰 ${clientesConActividad.length} clientes procesados con actividad financiera`, 'success')
-      
     } catch (error) {
       showNotification('❌ Error al cargar datos de cobros y pagos', 'error')
     }
@@ -4871,59 +4539,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Función específica para cargar bikers para "Agregar Pedido" (desde pestaña dedicada)
   const loadBikersForAgregar = async () => {
     try {
-
       setLoadingBikersAgregar(true)
       
-      const bikersUrl = import.meta.env.VITE_BIKERS_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRQ4OczeaNEWit2STNFO1e4V9aEP5JJY6TTPG3K4kRcIZhrRLLMCRIQXcccjUaL_Ltx9XTUPvE_dr9S/pub?gid=0&single=true&output=csv'
-
-      const res = await fetch(bikersUrl, { 
-        cache: 'no-store',
-        mode: 'cors',
-        headers: {
-          'Accept': 'text/csv'
-        }
-      })
-      if (!res.ok) {
-
-        showNotification('⚠️ No se pudieron cargar los bikers', 'error')
-        return
-      }
+      const bikersConAsignar = await loadBikersForAgregarAPI()
       
-          const csvText = await res.text()
-          const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
-          
-      const bikersData = parsed.data
-        .filter(row => row.Biker?.trim() || row.biker?.trim() || row.BIKER?.trim())
-            .map(row => {
-              const biker = {
-                id: row.ID || row.id || (row.Biker || row.biker || row.BIKER),
-                nombre: (row.Biker || row.biker || row.BIKER).trim(),
-                telefono: row['Contacto'] || row['contacto'] || row.Telefono || row.telefono || 'N/A',
-                whatsapp: row['WhatsApp'] || row['whatsapp'] || row['Whatsapp'] || 'N/A',
-                linkContacto: row['Link'] || row['link'] || 'N/A'
-              }
-
-              return biker
-            })
-        .sort((a, b) => a.nombre.localeCompare(b.nombre))
-      
-      // Agregar "ASIGNAR BIKER" como primera opción
-      const bikersConAsignar = [
-        {
-          id: 'ASIGNAR_BIKER',
-          nombre: 'ASIGNAR BIKER',
-          telefono: 'N/A',
-          whatsapp: 'N/A',
-          linkContacto: 'N/A'
-        },
-        ...bikersData
-      ]
-      
-      setBikersAgregar(bikersConAsignar) // Estado específico para "Agregar Pedido"
-      showNotification(`🚴‍♂️ ${bikersData.length} bikers cargados para Agregar Pedido`, 'success')
+      setBikersAgregar(bikersConAsignar)
+      showNotification(`🚴‍♂️ ${bikersConAsignar.length - 1} bikers cargados para Agregar Pedido`, 'success')
       
     } catch (error) {
-
       showNotification('⚠️ Error al cargar bikers. Usando datos locales.', 'error')
       // No fallar completamente, continuar con datos vacíos
     } finally {
@@ -4941,36 +4564,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  const getEmpresaMapa = (nombreEmpresa) => {
-    const empresa = empresas.find(e => e.empresa === nombreEmpresa)
-    return empresa ? empresa.mapa : ''
-  }
+  // getEmpresaMapa y getClienteInfo ahora se importan desde dataHelpers.js
 
-  const getClienteInfo = (nombreCliente) => {
-    if (!nombreCliente) return 'Otros - Sin teléfono'
-    
-    const empresaInfo = empresas.find(emp => emp.empresa === nombreCliente)
-    if (empresaInfo && empresaInfo.descripcion) {
-      return empresaInfo.descripcion
-    }
-    
-    // Fallback si no se encuentra la empresa
-    return `${nombreCliente} - Sin teléfono`
-  }
-
-  // Función para generar enlace de Google Maps desde una dirección
-  const generateGoogleMapsLink = (address) => {
-    if (!address || address.trim() === '') return ''
-    
-    // Si ya es un enlace de Google Maps, devolverlo tal como está
-    if (address.includes('maps.google.com') || address.includes('goo.gl/maps')) {
-      return address
-    }
-    
-    // Generar enlace de Google Maps desde la dirección
-    const encodedAddress = encodeURIComponent(address.trim())
-    return `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`
-  }
+  // generateGoogleMapsLink ahora se importa desde mapsUtils.js
 
   // Función para manejar cambio entre modo dropdown y manual
   const handleRecojoModeChange = (isManual) => {
@@ -5090,9 +4686,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   // Función para detectar si el valor actual es un enlace de Google Maps
-  const isGoogleMapsLink = (value) => {
-    return value && (value.includes('maps.google.com') || value.includes('goo.gl/maps'))
-  }
+  // isGoogleMapsLink ahora se importa desde mapsUtils.js
 
   // Función para generar enlace automáticamente cuando se escribe una dirección
   const handleAddressChange = (type, value) => {
@@ -5125,141 +4719,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  // Función para calcular distancia usando el proxy del backend
-  // Función para calcular el precio basado en distancia y medio de transporte
-  const calculatePrice = (distance, medioTransporte) => {
-    if (!distance || distance === '' || isNaN(parseFloat(distance))) {
-      return 0
-    }
-    
-    const dist = parseFloat(distance)
-    let basePrice = 0
-    
-    // Esquema de precios para Bicicleta (COSTOS TRANSPARENTES)
-    if (medioTransporte === 'Bicicleta') {
-      if (dist <= 1) {
-        basePrice = 8
-      } else if (dist <= 2) {
-        basePrice = 10
-      } else if (dist <= 3) {
-        basePrice = 12
-      } else if (dist <= 4) {
-        basePrice = 14
-      } else if (dist <= 5) {
-        basePrice = 16
-      } else if (dist <= 6) {
-        basePrice = 18
-      } else if (dist <= 7) {
-        basePrice = 20
-      } else if (dist <= 8) {
-        basePrice = 22
-      } else if (dist <= 9) {
-        basePrice = 24
-      } else if (dist <= 10) {
-        basePrice = 26
-      } else {
-        // Para distancias mayores a 10km: 26 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        basePrice = 26 + (kmAdicionales * 2)
-      }
-    } 
-    // Esquema de precios para BeeZero (inicia en 10 Bs)
-    else if (medioTransporte === 'Beezero') {
-      if (dist <= 1) {
-        basePrice = 10
-      } else if (dist <= 2) {
-        basePrice = 12
-      } else if (dist <= 3) {
-        basePrice = 14
-      } else if (dist <= 4) {
-        basePrice = 16
-      } else if (dist <= 5) {
-        basePrice = 18
-      } else if (dist <= 6) {
-        basePrice = 20
-      } else if (dist <= 7) {
-        basePrice = 22
-      } else if (dist <= 8) {
-        basePrice = 24
-      } else if (dist <= 9) {
-        basePrice = 26
-      } else if (dist <= 10) {
-        basePrice = 28
-      } else {
-        // Para distancias mayores a 10km: 28 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        basePrice = 28 + (kmAdicionales * 2)
-      }
-    }
-    // Esquema de precios para Cargo: Bicicleta + 6 Bs
-    else if (medioTransporte === 'Cargo') {
-      // Calcular precio base de Bicicleta
-      let precioBicicleta = 0
-      if (dist <= 1) {
-        precioBicicleta = 8
-      } else if (dist <= 2) {
-        precioBicicleta = 10
-      } else if (dist <= 3) {
-        precioBicicleta = 12
-      } else if (dist <= 4) {
-        precioBicicleta = 14
-      } else if (dist <= 5) {
-        precioBicicleta = 16
-      } else if (dist <= 6) {
-        precioBicicleta = 18
-      } else if (dist <= 7) {
-        precioBicicleta = 20
-      } else if (dist <= 8) {
-        precioBicicleta = 22
-      } else if (dist <= 9) {
-        precioBicicleta = 24
-      } else if (dist <= 10) {
-        precioBicicleta = 26
-      } else {
-        // Para distancias mayores a 10km: 26 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        precioBicicleta = 26 + (kmAdicionales * 2)
-      }
-      
-      // Cargo = Bicicleta + 6 Bs
-      basePrice = precioBicicleta + 6
-    }
-    // Para Scooter no se calcula precio automáticamente
-    else if (medioTransporte === 'Scooter') {
-      return 0 // Retorna 0 para indicar que no hay cálculo automático
-    } else {
-      // Esquema por defecto para otros medios de transporte
-      if (dist <= 1) {
-        basePrice = 6
-      } else {
-        const floorDist = Math.floor(dist)
-        const remainder = dist % 1
-        
-        if (remainder === 0) {
-          // Distancia exacta (sin decimales)
-          basePrice = floorDist * 2 + 4
-        } else {
-          // Distancia con decimales
-          basePrice = floorDist * 2 + 6
-        }
-      }
-    }
-    
-    if (medioTransporte === 'Scooter') {
-
-    } else {
-
-    }
-    
-    return basePrice
-  }
+  // calculatePrice ahora se importa desde priceCalculator.js
 
   // Función para limpiar URLs de Google Maps (espacios, paréntesis, etc.)
-  const cleanGoogleMapsUrl = (url) => {
-    if (!url || typeof url !== 'string') return url
-    // Limpiar espacios, paréntesis y otros caracteres problemáticos al inicio y final
-    return url.trim().replace(/^[\(\s]+|[\)\s]+$/g, '').trim()
-  }
+  // cleanGoogleMapsUrl ahora se importa desde mapsUtils.js
   
   // Función para validar un link de Google Maps
   const validarLinkGoogleMaps = async (url, tipo) => {
@@ -5307,140 +4770,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  const calculateDistance = async (origin, destination) => {
-    if (!origin || !destination) {
-
-      return null
-    }
-    
-    // Limpiar URLs antes de procesar
-    const cleanOrigin = cleanGoogleMapsUrl(origin)
-    const cleanDestination = cleanGoogleMapsUrl(destination)
-    
-    // Log: Inicio de cálculo de distancia
-    await logToCSV('distance_calculation_start', { 
-      origin: cleanOrigin,
-      destination: cleanDestination
-    }, 'info')
-    
-    try {
-
-      // Usar el proxy del backend
-      const baseUrl = getBackendUrl()
-      const proxyUrl = `${baseUrl}/api/distance-proxy?origins=${encodeURIComponent(cleanOrigin)}&destinations=${encodeURIComponent(cleanDestination)}`
-
-      const response = await fetch(proxyUrl)
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        let errorData
-        try {
-          errorData = JSON.parse(errorText)
-        } catch {
-          errorData = { error: errorText }
-        }
-        
-        const errorMessage = errorData.error || errorText || `Error ${response.status}: ${response.statusText}`
-        setLastDistanceError({
-          message: errorMessage,
-          status: response.status,
-          origin: cleanOrigin,
-          destination: cleanDestination,
-          fullError: JSON.stringify(errorData, null, 2)
-        })
-        return null
-      }
-      
-      const data = await response.json()
-      
-      // Verificar errores en la respuesta
-      if (data.error) {
-        setLastDistanceError({
-          message: data.error,
-          origin: cleanOrigin,
-          destination: cleanDestination,
-          fullError: JSON.stringify(data, null, 2)
-        })
-        return null
-      }
-      
-      if (data.status === 'OK' && data.rows && data.rows[0] && data.rows[0].elements && data.rows[0].elements[0]) {
-        const element = data.rows[0].elements[0]
-        
-        if (element.status === 'OK' && element.distance) {
-          const distanceKmRaw = element.distance.value / 1000
-          // Agregar 0.25 cuadras como margen de error para percances
-          const distanceKmWithBuffer = distanceKmRaw + DISTANCE_BUFFER_KM
-          const distanceKm = distanceKmWithBuffer.toFixed(2)
-          const duration = element.duration ? element.duration.text : ''
-          
-          // Log: Cálculo de distancia exitoso
-          await logToCSV('distance_calculation_success', { 
-            origin: cleanOrigin,
-            destination: cleanDestination,
-            distanceKmRaw: distanceKmRaw,
-            distanceKmWithBuffer: distanceKm,
-            buffer: DISTANCE_BUFFER_KM,
-            duration: duration
-          }, 'success')
-          
-          return distanceKm
-        } else {
-          const errorMessage = element.error_message || `Element status: ${element.status}`
-          setLastDistanceError({
-            message: errorMessage,
-            elementStatus: element.status,
-            origin: cleanOrigin,
-            destination: cleanDestination,
-            fullError: JSON.stringify(data, null, 2)
-          })
-
-          // Log: Error en cálculo de distancia
-          await logToCSV('distance_calculation_error', { 
-            origin: cleanOrigin,
-            destination: cleanDestination,
-            elementStatus: element.status
-          }, 'error', `Element status: ${element.status}`)
-          
-          return null
-        }
-      } else {
-        const errorMessage = data.error_message || `Status: ${data.status} - No se pudo calcular la distancia`
-        setLastDistanceError({
-          message: errorMessage,
-          status: data.status,
-          origin: origin,
-          destination: destination,
-          fullError: JSON.stringify(data, null, 2)
-        })
-        
-        // Log: Error en API de distancia
-        await logToCSV('distance_calculation_error', { 
-          origin: origin,
-          destination: destination,
-          apiStatus: data.status,
-          errorMessage: data.error_message
-        }, 'error', `API status: ${data.status}`)
-        
-        return null
-      }
-    } catch (error) {
-      setLastDistanceError({
-        message: error.message,
-        origin: origin,
-        destination: destination,
-        fullError: error.stack || error.toString()
-      })
-
-      // Log: Error de red en cálculo de distancia
-      await logToCSV('distance_calculation_error', { 
-        origin: origin,
-        destination: destination,
-        error: error.message
-      }, 'error', error)
-      
-      return null
-    }
+  // calculateDistance ahora se importa desde distanceCalculator.js
+  // Wrapper que maneja efectos secundarios (setLastDistanceError, logToCSV)
+  const calculateDistanceWrapper = async (origin, destination) => {
+    return await calculateDistance(origin, destination, {
+      onError: (errorObj) => {
+        setLastDistanceError(errorObj)
+      },
+      onLog: logToCSV
+    })
   }
 
   // Función para intercambiar recojo y entrega
@@ -5463,13 +4801,11 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Función separada para calcular distancia y precio
   const calculateDistanceAndPrice = async (direccionRecojo, direccionEntrega, medioTransporte) => {
     if (!direccionRecojo || !direccionEntrega) {
-
       return
     }
 
     // Evitar cálculos múltiples simultáneos
     if (isCalculatingDistance) {
-
       return
     }
 
@@ -5480,7 +4816,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       // Limpiar URLs antes de calcular
       const cleanRecojo = cleanGoogleMapsUrl(direccionRecojo)
       const cleanEntrega = cleanGoogleMapsUrl(direccionEntrega)
-      const distance = await calculateDistance(cleanRecojo, cleanEntrega)
+      const distance = await calculateDistanceWrapper(cleanRecojo, cleanEntrega)
 
       if (distance) {
         // Calcular precio solo si tenemos medio de transporte y no es Cuenta
@@ -5560,11 +4896,11 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
     // Auto-llenar direcciones con URLs de Maps (solo para modo dropdown)
     if (name === 'recojo' && !recojoManual) {
-      const empresaMapa = getEmpresaMapa(value) || ''
+      const empresaMapa = getEmpresaMapa(value, empresas) || ''
       updatedForm.direccion_recojo = empresaMapa
 
     } else if (name === 'entrega' && !entregaManual) {
-      const empresaMapa = getEmpresaMapa(value) || ''
+      const empresaMapa = getEmpresaMapa(value, empresas) || ''
       updatedForm.direccion_entrega = empresaMapa
 
     }
@@ -5794,274 +5130,41 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  // Función para filtrar solo los campos que van al Google Sheet
-  const filterOrderForSheet = (order) => {
-    // Función para convertir fecha del formulario (YYYY-MM-DD) a formato DD/MM/YYYY
-    const formatDateForSheet = (dateString) => {
-      if (!dateString) return ''
-      try {
-        // Si ya está en formato DD/MM/YYYY, devolverla tal como está
-        if (dateString.includes('/')) return dateString
-        
-        // Si viene del formulario en formato YYYY-MM-DD, convertir sin zona horaria
-        if (dateString.includes('-')) {
-          const [year, month, day] = dateString.split('-')
-          return `${day}/${month}/${year}`
-        }
-        
-        return dateString // Si no coincide ningún formato, devolver original
-      } catch (error) {
-
-        return dateString // Si hay error, devolver el valor original
-      }
-    }
-
-    const formatTimeForSheet = (timeString) => {
-      if (!timeString) return ''
-      try {
-        // Si ya está en formato HH:MM:SS, devolverla
-        if (timeString.includes(':') && !timeString.includes('T')) return timeString
-        
-        // Si es un timestamp, convertirlo a hora de Bolivia (UTC-4)
-        const date = new Date(timeString)
-        
-        // Ajustar a hora de Bolivia (UTC-4)
-        const boliviaOffset = -4 * 60 // -4 horas en minutos
-        const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000)
-        const boliviaTime = new Date(utcTime + (boliviaOffset * 60000))
-        
-        const hours = boliviaTime.getHours().toString().padStart(2, '0')
-        const minutes = boliviaTime.getMinutes().toString().padStart(2, '0')
-        const seconds = boliviaTime.getSeconds().toString().padStart(2, '0')
-        return `${hours}:${minutes}:${seconds}`
-      } catch (error) {
-        return timeString // Si hay error, devolver el valor original
-      }
-    }
-
-    // Usar los valores de fecha y hora que ya vienen formateados del pedido
-    // (generados por getBoliviaDateTime() en la función handleAdd)
-    const currentDate = order.fecha_registro || ''
-    const currentTime = order.hora_registro || ''
-
-    // ⚠️ IMPORTANTE: El orden DEBE coincidir exactamente con HEADER_ORDER del backend
-    // Orden correcto según Google Sheets:
-    // ID, Fecha Registro, Hora Registro, Operador, Cliente, Recojo, Entrega,
-    // Direccion Recojo, Direccion Entrega, Detalles de la Carrera, Dist. [Km],
-    // Medio Transporte, Precio [Bs], Método pago pago, Biker, WhatsApp,
-    // Fechas, Hora Ini, Hora Fin, Duracion, Estado, Estado de pago,
-    // Observaciones, Pago biker, Dia de la semana, Cobro o pago,
-    // Monto cobro o pago, Descripcion de cobro o pago,
-    // Validar que si hay mapas en las direcciones, no se guarde como "Cliente avisa"
-    // Función auxiliar para detectar mapas válidos
-    const hasValidMapsLink = (direccion) => {
-      if (!direccion || typeof direccion !== 'string') return false
-      const trimmed = direccion.trim()
-      return (
-        trimmed.includes('maps.app.goo.gl') ||
-        trimmed.includes('goo.gl/maps') ||
-        trimmed.includes('maps.google.com') ||
-        trimmed.includes('google.com/maps')
-      ) && trimmed !== 'Cliente avisa'
-    }
-    
-    // Corregir recojo si hay mapa pero dice "Cliente avisa"
-    let recojoFinal = order.recojo
-    if (hasValidMapsLink(order.direccion_recojo)) {
-      if (recojoFinal === 'Cliente avisa' || !recojoFinal || recojoFinal.trim() === '') {
-        recojoFinal = 'Sin especificar'
-      }
-    }
-    
-    // Corregir entrega si hay mapa pero dice "Cliente avisa"
-    let entregaFinal = order.entrega
-    if (hasValidMapsLink(order.direccion_entrega)) {
-      if (entregaFinal === 'Cliente avisa' || !entregaFinal || entregaFinal.trim() === '') {
-        entregaFinal = 'Sin especificar'
-      }
-    }
-    
-    // Info. Adicional Recojo, Info. Adicional Entrega, Tiempo de espera
-    return {
-      'ID': order.id,
-      'Fecha Registro': `'${currentDate}`, // Forzar como texto con comilla simple
-      'Hora Registro': `'${currentTime}`,  // Forzar como texto con comilla simple
-      'Operador': order.operador,
-      'Cliente': order.cliente,
-      'Recojo': recojoFinal, // Usar el valor corregido
-      'Entrega': entregaFinal, // Usar el valor corregido
-      'Direccion Recojo': order.direccion_recojo,
-      'Direccion Entrega': order.direccion_entrega,
-      'Detalles de la Carrera': order.detalles_carrera,
-      'Dist. [Km]': order.distancia_km,
-      'Medio Transporte': order.medio_transporte,
-      'Precio [Bs]': order.precio_bs,
-      'Método pago pago': order.metodo_pago,
-      'Biker': order.biker,
-      'WhatsApp': order.whatsapp,
-      'Fechas': (() => {
-        const fechaConvertida = formatDateForSheet(order.fecha) || currentDate
-
-        return `'${fechaConvertida}` // Forzar como texto
-      })(), // Usar fecha del pedido o actual
-      'Hora Ini': `'${formatTimeForSheet(order.hora_ini)}`, // Forzar como texto
-      'Hora Fin': `'${formatTimeForSheet(order.hora_fin)}`, // Forzar como texto
-      'Duracion': order.duracion,
-      'Estado': order.estado,
-      'Estado de pago': order.estado_pago,
-      'Observaciones': order.observaciones,
-      'Pago biker': order.pago_biker,
-      'Dia de la semana': order.dia_semana,
-      'Cobro o pago': order.cobro_pago || '',
-      'Monto cobro o pago': order.monto_cobro_pago || '',
-      'Descripcion de cobro o pago': order.descripcion_cobro_pago || '',
-      'Info. Adicional Recojo': order.info_direccion_recojo || '',
-      'Info. Adicional Entrega': order.info_direccion_entrega || '',
-      'Tiempo de espera': order.tiempo_espera || order['Tiempo de espera'] || ''
-    }
-  }
+  // Función filterOrderForSheet ahora se importa desde ordersService.js
 
   const saveToSheet = async (order, silent = false) => {
-
+    try {
     if (!SHEET_URL) {
-
       if (!silent) {
       showNotification('❌ URL del servidor no configurada', 'error')
       }
       return
     }
     
-    // Filtrar solo los campos que van al Google Sheet
-    const filteredOrder = filterOrderForSheet(order)
-
-    const res = await fetch(SHEET_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(SHEET_TOKEN ? { 'X-API-KEY': SHEET_TOKEN } : {})
-      },
-      body: JSON.stringify(filteredOrder)
-    })
-
-    if (res.ok) {
-      const responseData = await res.json()
-
-      // Solo mostrar notificación si no está en modo silencioso (duplicación maneja sus propias notificaciones)
+      const result = await saveOrderToSheet(order, silent, SHEET_URL, SHEET_TOKEN)
+      
       if (!silent) {
       showNotification('✅ Pedido guardado en Google Sheet', 'success')
       }
-    } else {
-      const errorText = await res.text()
-
+    } catch (error) {
       if (!silent) {
-      showNotification(`❌ Error al guardar: ${res.status}`, 'error')
+        showNotification('❌ Error al guardar', 'error')
       }
-      throw new Error(`Fallo al guardar en Google Sheet: ${res.status}`)
+      throw error
     }
   }
 
   const updateOrderInSheet = async (order) => {
-
-    // Usar el endpoint específico para actualizar pedidos
-    const updateUrl = getApiUrl('/api/update-order-status')
-
-    // Preparar datos para el endpoint de actualización
-    const updateData = {
-      orderId: String(order.id),
-      newStatus: order.estado || 'En proceso', // Mantener estado actual o usar default
-      additionalData: {
-        // Incluir todos los campos que queremos actualizar
-        operador: order.operador,
-        cliente: order.cliente,
-        recojo: order.recojo,
-        entrega: order.entrega,
-        direccion_recojo: order.direccion_recojo,
-        info_direccion_recojo: order.info_direccion_recojo !== undefined && order.info_direccion_recojo !== null 
-          ? String(order.info_direccion_recojo) 
-          : (order['Info. Adicional Recojo'] !== undefined && order['Info. Adicional Recojo'] !== null 
-            ? String(order['Info. Adicional Recojo']) 
-            : ''),
-        direccion_entrega: order.direccion_entrega,
-        info_direccion_entrega: order.info_direccion_entrega !== undefined && order.info_direccion_entrega !== null 
-          ? String(order.info_direccion_entrega) 
-          : (order['Info. Adicional Entrega'] !== undefined && order['Info. Adicional Entrega'] !== null 
-            ? String(order['Info. Adicional Entrega']) 
-            : ''),
-        detalles_carrera: order.detalles_carrera,
-        distancia: order.distancia || order.distancia_km,
-        medio_transporte: order.medio_transporte,
-        precio: order.precio || order.precio_bs,
-        metodo_pago: order.metodo_pago,
-        estado_pago: order.estado_pago, // ✅ Agregado
-        biker: order.biker,
-        whatsapp: order.whatsapp,
-        fecha: order.fecha,
-        hora_ini: order.hora_ini,
-        hora_fin: order.hora_fin,
-        duracion: order.duracion,
-        tiempo_espera: order.tiempo_espera || order['Tiempo de espera'] || order['Tiempo de Espera'] || '',
-        observaciones: order.observaciones,
-        pago_biker: order.pago_biker,
-        dia_semana: order.dia_semana,
-        cobro_pago: order.cobro_pago,
-        monto_cobro_pago: order.monto_cobro_pago,
-        descripcion_cobro_pago: order.descripcion_cobro_pago
-      }
-    }
-    
-    const res = await fetch(updateUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(updateData)
-    })
-
-    if (res.ok) {
-      const responseData = await res.json()
-
-      showNotification('✅ Pedido actualizado en Google Sheet', 'success')
-    } else {
-      const errorText = await res.text()
-
-      showNotification('❌ Error al actualizar en Google Sheet', 'error')
-      throw new Error(`Error ${res.status}: ${errorText}`)
-    }
-  }
-
-  const getNextId = async () => {
     try {
-      // Usar el endpoint seguro del backend
-
-      const response = await fetch('/api/next-id', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: AbortSignal.timeout(10000) // Timeout de 10 segundos
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-
-          return data.nextId
-        } else {
-          throw new Error(data.error || 'Error en respuesta del backend')
-        }
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
+      const result = await updateOrderInSheetAPI(order)
+      showNotification('✅ Pedido actualizado en Google Sheet', 'success')
     } catch (error) {
-
-      // Fallback: usar timestamp como ID único
-
-      const timestampId = Date.now()
-
-      return timestampId
+      showNotification('❌ Error al actualizar en Google Sheet', 'error')
+      throw error
     }
   }
+
+  // getNextId ahora se importa desde ordersService.js
 
   // Duplicar pedido con múltiples fechas
   const duplicateOrder = async (originalOrder, selectedDates) => {
@@ -6151,63 +5254,13 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  // Validar campos obligatorios
-  const validateForm = () => {
-    const errors = []
-    const requiredFields = {
-      cliente: 'Cliente',
-      medio_transporte: 'Medio de Transporte',
-      metodo_pago: 'Método de Pago',
-      biker: 'Biker Asignado',
-      fecha: 'Fecha del Pedido',
-      estado: 'Estado del Pedido',
-      estado_pago: 'Estado de Pago'
-    }
-
-    // Solo requerir recojo y entrega si no está en modo "Cliente avisa"
-    if (!recojoClienteAvisa) {
-      requiredFields.recojo = 'Punto de Recojo'
-    }
-    if (!entregaClienteAvisa) {
-      requiredFields.entrega = 'Punto de Entrega'
-    }
-
-    // Validar que si hay recojo/entrega, también debe haber dirección (solo si no es "Cliente avisa")
-    if (form.recojo && form.recojo !== 'Cliente avisa' && !form.direccion_recojo) {
-      errors.push('El punto de recojo debe tener una dirección asociada')
-    }
-    if (form.entrega && form.entrega !== 'Cliente avisa' && !form.direccion_entrega) {
-      errors.push('El punto de entrega debe tener una dirección asociada')
-    }
-
-    // Validar campos obligatorios básicos
-    for (const [field, label] of Object.entries(requiredFields)) {
-      if (!form[field] || form[field].trim() === '') {
-        errors.push(`${label} es obligatorio`)
-      }
-    }
-
-    // Validaciones específicas
-    // Removida la validación de fecha futura - ahora se permiten fechas futuras
-
-    if (form.precio_bs && (isNaN(form.precio_bs) || parseFloat(form.precio_bs) < 0)) {
-      errors.push('El precio debe ser un número mayor o igual a 0')
-    }
-
-    if (form.whatsapp && form.whatsapp.length > 0 && form.whatsapp.length < 8) {
-      errors.push('El número de WhatsApp debe tener al menos 8 dígitos')
-    }
-
-    // Validar cobro/pago
-    if (form.cobro_pago && form.cobro_pago.trim() !== '') {
-      if (!form.monto_cobro_pago || form.monto_cobro_pago.trim() === '') {
-        errors.push('Si seleccionas Cobro o Pago, debes especificar el monto')
-      } else if (isNaN(parseFloat(form.monto_cobro_pago)) || parseFloat(form.monto_cobro_pago) <= 0) {
-        errors.push('El monto de cobro/pago debe ser un número mayor a 0')
-      }
-    }
-
-    return errors
+  // validateForm ahora se importa desde formValidator.js
+  // Wrapper para pasar opciones del componente
+  const validateFormWrapper = () => {
+    return validateForm(form, {
+      recojoClienteAvisa,
+      entregaClienteAvisa
+    })
   }
 
   const handleAdd = async (e) => {
@@ -6217,7 +5270,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     if (editingOrder) {
 
       // Validar formulario
-      const validationErrors = validateForm()
+      const validationErrors = validateFormWrapper()
       if (validationErrors.length > 0) {
         const errorMessage = `Por favor, corrija los siguientes errores:\n\n${validationErrors.map(error => `• ${error}`).join('\n')}`
         showNotification(errorMessage, 'error')
@@ -6294,9 +5347,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     // Log: Intento de envío del formulario
     await logToCSV('form_submit_attempt', { formData: form }, 'info')
     
-    // Validar formulario
-    const validationErrors = validateForm()
-    if (validationErrors.length > 0) {
+      // Validar formulario
+      const validationErrors = validateFormWrapper()
+      if (validationErrors.length > 0) {
       // Log: Error de validación
       await logToCSV('form_validation_error', { 
         formData: form, 
@@ -6540,70 +5593,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     return whatsappURL
   }
 
-  const normalize = (s) => String(s || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[^a-z0-9]/g, '')
-
-  const headerMap = {
-    fecha: 'fecha', fechas: 'fecha',
-    fecharegistro: 'fecha_registro',
-    horaregistro: 'hora_registro',
-    operador: 'operador',
-    cliente: 'cliente',
-    recojo: 'recojo',
-    entrega: 'entrega',
-    direccionrecojo: 'direccion_recojo', direcciondelrecojo: 'direccion_recojo', direccionderecojo: 'direccion_recojo',
-    informaciondireccionrecojo: 'info_direccion_recojo', infodireccionrecojo: 'info_direccion_recojo', infoadicionalrecojo: 'info_direccion_recojo',
-    direccionentrega: 'direccion_entrega', direcciondeentrega: 'direccion_entrega',
-    informaciondireccionentrega: 'info_direccion_entrega', infodireccionentrega: 'info_direccion_entrega', infoadicionalentrega: 'info_direccion_entrega',
-    detallescarrera: 'detalles_carrera', detallesdelacarrera: 'detalles_carrera',
-    distanciakm: 'distancia_km', distkm: 'distancia_km', distancia: 'distancia_km',
-    mediotransporte: 'medio_transporte', transporte: 'medio_transporte',
-    preciobs: 'precio_bs', precio: 'precio_bs',
-    metodopago: 'metodo_pago', metododepago: 'metodo_pago', metodopagopago: 'metodo_pago',
-    estadopago: 'estado_pago', estadodepago: 'estado_pago',
-    bikers: 'biker', biker: 'biker',
-    whatsapp: 'whatsapp',
-    horaini: 'hora_ini', horainicio: 'hora_ini',
-    horafin: 'hora_fin',
-    duracion: 'duracion',
-    tiempodeespera: 'tiempo_espera',
-    estado: 'estado',
-    observaciones: 'observaciones',
-    pagobiker: 'pago_biker',
-    
-    diadelasem: 'dia_semana', diadelasemana: 'dia_semana',
-    cobropago: 'cobro_pago', cobroopago: 'cobro_pago',
-    montocobropago: 'monto_cobro_pago', montocobroopago: 'monto_cobro_pago',
-    descripcioncobropago: 'descripcion_cobro_pago', descripciondecobroopago: 'descripcion_cobro_pago'
-  }
-
-  // Función para convertir fecha de Excel a formato estándar
-  const convertExcelDate = (excelDate) => {
-    if (!excelDate || excelDate === 'N/A') return ''
-    
-    // Si ya es una fecha en formato estándar, devolverla
-    if (excelDate.includes('/') || excelDate.includes('-')) {
-      return excelDate
-    }
-    
-    // Convertir número de Excel a fecha
-    const excelNum = parseFloat(excelDate)
-    if (isNaN(excelNum)) return excelDate
-    
-    // Excel cuenta desde 1900-01-01, pero tiene un bug con 1900 siendo año bisiesto
-    const excelEpoch = new Date(1900, 0, 1)
-    const date = new Date(excelEpoch.getTime() + (excelNum - 1) * 24 * 60 * 60 * 1000)
-    
-    // Formato DD/MM/YYYY
-    const day = date.getDate().toString().padStart(2, '0')
-    const month = (date.getMonth() + 1).toString().padStart(2, '0')
-    const year = date.getFullYear()
-    
-    return `${day}/${month}/${year}`
-  }
+  // normalize, headerMap, convertExcelDate, y mapRowToOrder ahora se importan desde ordersService.js
 
   // Función para formatear fechas para mostrar en DD/MM/YYYY
   const formatDateForDisplay = (dateString) => {
@@ -6800,32 +5790,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     window.testNotification = testNotification
   }
 
-  const mapRowToOrder = (rowObj, index = 0) => {
-    const mapped = { id: index.toString(), ...initialOrder }
-    const entries = Object.entries(rowObj || {})
-    for (const [k, v] of entries) {
-      if (k.toLowerCase() === 'id') {
-        // Si viene un ID del sheet, usarlo, sino usar el índice
-        const sheetId = String(v ?? '').trim()
-        mapped.id = sheetId && !isNaN(parseInt(sheetId)) ? sheetId : index.toString()
-      } else {
-        const key = headerMap[normalize(k)]
-        if (key) {
-          let value = String(v ?? '').trim()
-          
-          // Convertir fechas de Excel a formato estándar
-          if (key === 'fecha' || key === 'fechas') {
-            value = convertExcelDate(value)
-          }
-          
-          mapped[key] = value
-        }
-      }
-    }
-    if (!mapped.operador) mapped.operador = operadorDefault
-    
-    return mapped
-  }
+  // mapRowToOrder ahora se importa desde ordersService.js
 
   const csvEscape = (v) => {
     const s = String(v ?? '')
@@ -6871,25 +5836,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   // Función para enviar logs al servidor
   const saveLogsToServer = async (logs) => {
-    try {
-      const baseUrl = getBackendUrl()
-      const response = await fetch(`${baseUrl}/api/save-logs`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ logs })
-      })
-      
-      if (response.ok) {
-        const result = await response.json()
-
-      } else {
-
-      }
-    } catch (err) {
-
-    }
+    const result = await saveLogsAPI(logs)
+    return result
   }
 
   // Función para guardar logs en el proyecto
@@ -6925,44 +5873,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   const loadOrdersFromSheet = async (forceReload = false) => {
-
     if (loading) {
-
       return // Evitar múltiples llamadas simultáneas
     }
     
     // Si ya hay datos cargados y no es una recarga forzada, no hacer nada
     if (!forceReload && dataLoaded && orders.length > 0) {
-
       return
-    }
-
-    if (forceReload) {
-
     }
     
     try {
       setLoading(true)
       
-      // Usar el endpoint del backend que tiene acceso a Google Sheets API
-      const backendUrl = getBackendUrl()
-      const readUrl = `${backendUrl}/api/read-orders`
+      const data = await loadOrdersAPI()
 
-      const res = await fetch(readUrl, { cache: 'no-store' })
-
-      if (!res.ok) {
-        const errorText = await res.text()
-
-        showNotification(`❌ Error al cargar datos: ${res.status}`, 'error')
-        return
-      }
-      
-      const response = await res.json()
-
-      if (response.data && response.data.length > 0) {
-        // Mapear los datos usando la función existente
-
-        const imported = response.data.map((row, index) => mapRowToOrder(row, index))
+      if (data && data.length > 0) {
+        // Mapear los datos usando la función del servicio
+        const imported = data.map((row, index) => mapRowToOrder(row, index, initialOrder, operadorDefault))
 
       // Limpiar duplicados por ID (mantener solo el último)
       const uniqueOrders = imported.reduce((acc, current) => {
@@ -6979,15 +5906,12 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       setOrders(uniqueOrders)
       setDataLoaded(true)
         showNotification(`✅ ${uniqueOrders.length} pedidos cargados desde Google Sheets API`, 'success')
-
       } else {
-
         showNotification('📋 No hay pedidos en el sheet', 'info')
         setOrders([])
         setDataLoaded(true)
       }
     } catch (err) {
-
       showNotification('❌ Error al cargar pedidos desde Google Sheet', 'error')
     } finally {
       setLoading(false)
@@ -7725,8 +6649,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           className={!form.recojo && !recojoClienteAvisa ? 'field-required' : ''}
                           required={!recojoClienteAvisa}
                         />
-                        {form.recojo && getEmpresaMapa(form.recojo) && (
-                          <a href={getEmpresaMapa(form.recojo)} target="_blank" rel="noopener noreferrer" className="btn-maps" title={`Ver en Maps: ${form.recojo}`}>
+                        {form.recojo && getEmpresaMapa(form.recojo, empresas) && (
+                          <a href={getEmpresaMapa(form.recojo, empresas)} target="_blank" rel="noopener noreferrer" className="btn-maps" title={`Ver en Maps: ${form.recojo}`}>
                             📍 Maps
                           </a>
                         )}

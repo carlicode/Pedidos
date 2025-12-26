@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Icon from './Icon.jsx'
 
 /**
@@ -49,17 +49,31 @@ const isEmptyOrZero = (value) => {
 const CerrarTurnoModal = ({ orders = [], operador, onClose }) => {
   const [isVisible, setIsVisible] = useState(false)
 
-  useEffect(() => {
-    // Animación de entrada
-    setTimeout(() => setIsVisible(true), 100)
-  }, [])
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsVisible(false)
     setTimeout(() => {
       onClose()
     }, 300)
-  }
+  }, [onClose])
+
+  useEffect(() => {
+    // Animación de entrada
+    setTimeout(() => setIsVisible(true), 100)
+    
+    // Agregar listener para cerrar con ESC
+    const handleEscKey = (event) => {
+      if (event.key === 'Escape') {
+        handleClose()
+      }
+    }
+    
+    window.addEventListener('keydown', handleEscKey)
+    
+    // Limpiar listener al desmontar
+    return () => {
+      window.removeEventListener('keydown', handleEscKey)
+    }
+  }, [handleClose])
 
   // Filtrar carreras del turno actual (día actual del operador)
   const carrerasTurno = useMemo(() => {
@@ -87,6 +101,14 @@ const CerrarTurnoModal = ({ orders = [], operador, onClose }) => {
     return carrerasTurno.filter(order => {
       const estado = order.Estado || order.estado || ''
       return estado.toLowerCase() === 'entregado'
+    })
+  }, [carrerasTurno])
+
+  // Filtrar carreras NO entregadas (Pendiente, En carrera) - excluir Canceladas
+  const carrerasNoEntregadas = useMemo(() => {
+    return carrerasTurno.filter(order => {
+      const estado = (order.Estado || order.estado || '').toLowerCase()
+      return estado !== 'entregado' && estado !== 'cancelado'
     })
   }, [carrerasTurno])
 
@@ -257,7 +279,7 @@ const CerrarTurnoModal = ({ orders = [], operador, onClose }) => {
             >
               Resumen del Turno
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
               <div>
                 <p style={{ margin: 0, fontSize: '14px', color: 'var(--muted)', marginBottom: '4px' }}>
                   Total de carreras
@@ -272,6 +294,14 @@ const CerrarTurnoModal = ({ orders = [], operador, onClose }) => {
                 </p>
                 <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
                   {analisis.totalEntregadas}
+                </p>
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--muted)', marginBottom: '4px' }}>
+                  Carreras no entregadas
+                </p>
+                <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>
+                  {carrerasNoEntregadas.length}
                 </p>
               </div>
             </div>
@@ -445,6 +475,92 @@ const CerrarTurnoModal = ({ orders = [], operador, onClose }) => {
               <p style={{ margin: 0, fontSize: '16px', color: 'var(--muted)' }}>
                 No hay carreras entregadas en este turno.
               </p>
+            </div>
+          )}
+
+          {/* Lista de Carreras No Entregadas */}
+          {carrerasNoEntregadas.length > 0 && (
+            <div
+              style={{
+                backgroundColor: 'var(--bg-secondary)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '24px',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <h3
+                style={{
+                  margin: '0 0 16px 0',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  color: 'var(--text)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '20px' }}>📋</span>
+                Carreras No Entregadas ({carrerasNoEntregadas.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                {carrerasNoEntregadas.map((order, index) => {
+                  const estado = (order.Estado || order.estado || 'Pendiente').toLowerCase()
+                  const id = order.id || order.ID || 'N/A'
+                  const cliente = order.Cliente || order.cliente || 'Sin cliente'
+                  const recojo = order.Recojo || order.recojo || 'Sin especificar'
+                  const entrega = order.Entrega || order.entrega || 'Sin especificar'
+                  
+                  // Colores según estado
+                  let estadoColor = '#6b7280' // gris por defecto (Pendiente)
+                  if (estado === 'en carrera') estadoColor = '#3b82f6' // azul
+                  else if (estado === 'cancelado') estadoColor = '#ef4444' // rojo
+                  else if (estado === 'pendiente') estadoColor = '#6b7280' // gris
+                  
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        border: '1px solid var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                          <span style={{ 
+                            fontSize: '14px', 
+                            fontWeight: '600', 
+                            color: 'var(--text)',
+                            minWidth: '60px'
+                          }}>
+                            ID: {id}
+                          </span>
+                          <span style={{
+                            fontSize: '12px',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            backgroundColor: estadoColor,
+                            color: 'white',
+                            fontWeight: '500',
+                            textTransform: 'capitalize',
+                          }}>
+                            {estado}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
+                          <div><strong>Cliente:</strong> {cliente}</div>
+                          <div><strong>Recojo:</strong> {recojo} → <strong>Entrega:</strong> {entrega}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
