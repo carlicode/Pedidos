@@ -532,18 +532,24 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   const detectInputMode = (value, direccion = '') => {
     if (!value) return false
     
-    // Si hay un mapa válido en la dirección, DEBE ser Manual (no puede ser Cliente avisa)
-    if (hasValidMapsLink(direccion)) {
-      return true
-    }
-    
     // Si el valor es "Cliente avisa", no es manual (es Cliente avisa)
     if (value === 'Cliente avisa') {
       return false
     }
     
+    // PRIMERO verificar si es una empresa válida - si es empresa, NO es manual
+    const esEmpresa = empresas.some(emp => emp.empresa === value)
+    if (esEmpresa) {
+      return false // Es empresa, modo dropdown
+    }
+    
+    // Si el valor no es una empresa y hay un mapa válido en la dirección, es Manual
+    if (hasValidMapsLink(direccion)) {
+      return true
+    }
+    
     // Si el valor no está en la lista de empresas, asumir que es entrada manual
-    return !empresas.some(emp => emp.empresa === value)
+    return true
   }
 
   // Detectar modo automáticamente cuando cambian los valores
