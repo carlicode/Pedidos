@@ -157,7 +157,7 @@ const INVENTARIO_SHEET_ID = process.env.INVENTARIO_SHEET_ID || '1x06KG0Xqf_yoQkF
 const HISTORIAL_SHEET_ID = process.env.HISTORIAL_SHEET_ID || INVENTARIO_SHEET_ID || '1x06KG0Xqf_yoQkFyFiIZ6JFoCGcQMfFFz49lLt2ipFY' // ID del Sheet de Historial (mismo que inventarios)
 const HISTORIAL_SHEET_NAME = process.env.HISTORIAL_SHEET_NAME || 'Historial de productos' // Nombre de la pestaña de historial
 const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || ''
-const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-62dea82962da.json'
+const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '/Users/carli.code/Desktop/Pedidos/beezero-62dea82962da.json'
 
 // API Key de Google Maps - debe estar configurada en variables de entorno
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY

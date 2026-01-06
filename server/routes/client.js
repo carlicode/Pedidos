@@ -20,7 +20,7 @@ function getInventarioSheetId() {
 }
 
 function getServiceAccountFile() {
-  return process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-62dea82962da.json';
+  return process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '/Users/carli.code/Desktop/Pedidos/beezero-62dea82962da.json';
 }
 
 function getPort() {

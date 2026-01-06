@@ -93,7 +93,7 @@ Crear archivo `.env` en la raíz del proyecto:
 # Google Sheets
 SHEET_ID=tu_sheet_id
 SHEET_NAME=Registros
-SERVICE_ACCOUNT_FILE=../beezero-62dea82962da.json
+SERVICE_ACCOUNT_FILE=/Users/carli.code/Desktop/Pedidos/beezero-62dea82962da.json
 
 # Google Maps API
 GOOGLE_MAPS_API_KEY=tu_api_key
