@@ -148,15 +148,14 @@ export const filterOrderForSheet = (order) => {
         return convertExcelDate(trimmed)
       }
       
-      // Intentar crear un Date object y convertir usando toLocaleDateString (igual que el servidor)
+      // Intentar crear un Date object y convertir manualmente a DD/MM/YYYY
       const date = new Date(trimmed)
       if (!isNaN(date.getTime())) {
-        // Usar el mismo método que el servidor para consistencia
-        return date.toLocaleDateString('es-BO', { 
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        })
+        // Construir manualmente para garantizar formato DD/MM/YYYY
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        return `${day}/${month}/${year}`
       }
       
       // Si no se pudo parsear, devolver string vacío

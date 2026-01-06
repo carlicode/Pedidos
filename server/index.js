@@ -3244,12 +3244,11 @@ app.post('/api/create-client-order', async (req, res) => {
     
     // Generar fecha y hora actual
     const now = new Date()
-    // Formato DD/MM/YYYY para coincidir con el sheet
-    const fechaRegistro = now.toLocaleDateString('es-BO', { 
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric'
-    })
+    // Formato DD/MM/YYYY - construir manualmente para garantizar el formato correcto
+    const day = String(now.getDate()).padStart(2, '0')
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const year = now.getFullYear()
+    const fechaRegistro = `${day}/${month}/${year}`
     
     const horaRegistro = now.toLocaleTimeString('es-BO', { 
       hour: '2-digit', 
@@ -3614,12 +3613,11 @@ app.post('/api/cliente/crear-pedido', async (req, res) => {
     
     // Generar fecha y hora de registro (actual, Bolivia)
     const now = new Date()
-    const fechaRegistro = now.toLocaleDateString('es-BO', { 
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric',
-      timeZone: 'America/La_Paz'
-    })
+    // Formato DD/MM/YYYY - construir manualmente para garantizar el formato correcto
+    const day = String(now.getDate()).padStart(2, '0')
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const year = now.getFullYear()
+    const fechaRegistro = `${day}/${month}/${year}`
     
     const horaRegistro = now.toLocaleTimeString('es-BO', { 
       hour: '2-digit', 
