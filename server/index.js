@@ -60,12 +60,17 @@ function normalizeDateToDDMMYYYY(dateString) {
     
     // Si viene en formato YYYY-MM-DD, convertir a DD/MM/YYYY
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-      const [year, month, day] = trimmed.split('-')
-      // Validar que sea una fecha válida
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-      if (date.getFullYear() == year && date.getMonth() == parseInt(month) - 1 && date.getDate() == day) {
-        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
-      }
+      const parts = trimmed.split('-')
+      const year = parts[0]
+      const month = parts[1]
+      const day = parts[2]
+      
+      console.log(`📅 Normalizando fecha YYYY-MM-DD: "${trimmed}"`)
+      console.log(`   - year: ${year}, month: ${month}, day: ${day}`)
+      console.log(`   - Resultado: ${day}/${month}/${year}`)
+      
+      // Retornar directamente sin validación (para evitar problemas de zona horaria)
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
     }
     
     // Si es un número (serial date de Excel/Google Sheets), convertir a fecha
@@ -85,12 +90,29 @@ function normalizeDateToDDMMYYYY(dateString) {
       }
     }
     
-    // Intentar parsear como Date object
+    // Intentar parsear como Date object (evitando problemas de zona horaria)
+    // Para fechas YYYY-MM-DD, usar el constructor con componentes individuales
+    if (/^\d{4}-\d{1,2}-\d{1,2}/.test(trimmed)) {
+      const parts = trimmed.split(/[-T]/)
+      const year = parseInt(parts[0])
+      const month = parseInt(parts[1])
+      const day = parseInt(parts[2])
+      
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const dayStr = String(day).padStart(2, '0')
+        const monthStr = String(month).padStart(2, '0')
+        console.log(`📅 Normalizando fecha con regex flexible: "${trimmed}" -> ${dayStr}/${monthStr}/${year}`)
+        return `${dayStr}/${monthStr}/${year}`
+      }
+    }
+    
+    // Como último recurso, intentar parsear como Date
     const date = new Date(trimmed)
     if (!isNaN(date.getTime())) {
       const day = String(date.getDate()).padStart(2, '0')
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const year = date.getFullYear()
+      console.log(`📅 Fecha parseada con new Date: "${trimmed}" -> ${day}/${month}/${year}`)
       return `${day}/${month}/${year}`
     }
     
