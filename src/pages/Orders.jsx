@@ -110,14 +110,14 @@ const initialOrder = {
   medio_transporte: '',
   precio_bs: '',
   metodo_pago: '',
-  estado_pago: '',
+  estado_pago: 'Debe Cliente',
   biker: '',
   whatsapp: '',
   hora_ini: '', // Vacío por defecto, se llena con el botón "Ahora"
   hora_fin: '',
   tiempo_espera: '',
   duracion: '',
-  estado: '',
+  estado: 'Pendiente',
 
   observaciones: '',
   pago_biker: '',
@@ -4411,7 +4411,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       ...form,
       operador: operadorDefault, // Asegurar que el operador se asigne correctamente
       fecha_registro: fechaRegistro,
-      hora_registro: horaRegistro
+      hora_registro: horaRegistro,
+      // Valores por defecto para estado y estado de pago
+      estado: form.estado || 'Pendiente',
+      estado_pago: form.estado_pago || 'Debe Cliente'
     }
     
     // Log de debug para verificar que ambos campos se envíen correctamente

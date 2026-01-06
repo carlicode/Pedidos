@@ -93,7 +93,7 @@ Crear archivo `.env` en la raíz del proyecto:
 # Google Sheets
 SHEET_ID=tu_sheet_id
 SHEET_NAME=Registros
-SERVICE_ACCOUNT_FILE=../beezero-1d5503cf3b22.json
+SERVICE_ACCOUNT_FILE=../beezero-62dea82962da.json
 
 # Google Maps API
 GOOGLE_MAPS_API_KEY=tu_api_key
@@ -170,7 +170,7 @@ Beezy-app/
 
 - El sistema usa Google Sheets como base de datos
 - Se requiere conexión a internet para usar las APIs de Google Maps
-- Los archivos de credenciales (`beezero-1d5503cf3b22.json`) no deben subirse al repositorio
+- Los archivos de credenciales (`beezero-62dea82962da.json`) no deben subirse al repositorio
 
 ## 🤝 Contribución
 

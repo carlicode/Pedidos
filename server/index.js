@@ -33,6 +33,74 @@ function normalizeSlot(slot) {
   }
   return slot
 }
+
+/**
+ * Normaliza una fecha a formato DD/MM/YYYY para Google Sheets
+ * Acepta múltiples formatos de entrada y siempre devuelve DD/MM/YYYY
+ * @param {string} dateString - Fecha en cualquier formato
+ * @returns {string} Fecha en formato DD/MM/YYYY o string vacío si es inválida
+ */
+function normalizeDateToDDMMYYYY(dateString) {
+  if (!dateString && dateString !== 0) return ''
+  
+  // Convertir a string si es número (puede ser serial de Excel)
+  let trimmed = String(dateString).trim()
+  if (!trimmed) return ''
+  
+  try {
+    // Si ya está en formato DD/MM/YYYY, validar y devolver
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      const [day, month, year] = trimmed.split('/')
+      // Validar que sea una fecha válida
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      if (date.getDate() == day && date.getMonth() == parseInt(month) - 1 && date.getFullYear() == year) {
+        return trimmed
+      }
+    }
+    
+    // Si viene en formato YYYY-MM-DD, convertir a DD/MM/YYYY
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      const [year, month, day] = trimmed.split('-')
+      // Validar que sea una fecha válida
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      if (date.getFullYear() == year && date.getMonth() == parseInt(month) - 1 && date.getDate() == day) {
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
+      }
+    }
+    
+    // Si es un número (serial date de Excel/Google Sheets), convertir a fecha
+    const excelNum = parseFloat(trimmed)
+    if (!isNaN(excelNum) && isFinite(excelNum) && excelNum > 0) {
+      // Google Sheets usa el mismo sistema que Excel: 1 = 1900-01-01
+      // Pero JavaScript Date usa 1970-01-01 como epoch
+      // Diferencia: 25569 días entre 1900-01-01 y 1970-01-01
+      const excelEpoch = new Date(1899, 11, 30) // 30 de diciembre de 1899 (día 0 en Excel)
+      const jsDate = new Date(excelEpoch.getTime() + (excelNum - 1) * 86400000)
+      
+      if (!isNaN(jsDate.getTime())) {
+        const day = String(jsDate.getDate()).padStart(2, '0')
+        const month = String(jsDate.getMonth() + 1).padStart(2, '0')
+        const year = jsDate.getFullYear()
+        return `${day}/${month}/${year}`
+      }
+    }
+    
+    // Intentar parsear como Date object
+    const date = new Date(trimmed)
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      return `${day}/${month}/${year}`
+    }
+    
+    // Si no se pudo parsear, devolver string vacío
+    return ''
+  } catch (error) {
+    console.warn('Error normalizando fecha:', dateString, error)
+    return ''
+  }
+}
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
@@ -89,7 +157,7 @@ const INVENTARIO_SHEET_ID = process.env.INVENTARIO_SHEET_ID || '1x06KG0Xqf_yoQkF
 const HISTORIAL_SHEET_ID = process.env.HISTORIAL_SHEET_ID || INVENTARIO_SHEET_ID || '1x06KG0Xqf_yoQkFyFiIZ6JFoCGcQMfFFz49lLt2ipFY' // ID del Sheet de Historial (mismo que inventarios)
 const HISTORIAL_SHEET_NAME = process.env.HISTORIAL_SHEET_NAME || 'Historial de productos' // Nombre de la pestaña de historial
 const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || ''
-const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-1d5503cf3b22.json'
+const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-62dea82962da.json'
 
 // API Key de Google Maps - debe estar configurada en variables de entorno
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY
@@ -274,7 +342,26 @@ function buildRow(order) {
   // Por lo tanto, podemos mapear directamente usando HEADER_ORDER
   for (let i = 0; i < HEADER_ORDER.length; i++) {
     const columnName = HEADER_ORDER[i]
-    const value = order[columnName] ?? ''
+    let value = order[columnName] ?? ''
+    
+    // Establecer valores por defecto para Estado y Estado de pago
+    if (columnName === 'Estado' && !value) {
+      value = 'Pendiente'
+    }
+    if (columnName === 'Estado de pago' && !value) {
+      value = 'Debe Cliente'
+    }
+    
+    // Normalizar fechas a formato DD/MM/YYYY y forzar como texto
+    if (columnName === 'Fechas' && value) {
+      value = normalizeDateToDDMMYYYY(value)
+      // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
+      if (value) {
+        value = `'${value}`
+      }
+      console.log(`  📅 Fecha normalizada: "${order[columnName]}" -> "${value}"`)
+    }
+    
     row[i] = value
     console.log(`  ${columnName} (posición ${i}): "${value}"`)
     
@@ -1570,11 +1657,18 @@ app.get('/api/read-orders', async (req, res) => {
     console.log('📊 Headers encontrados:', headers)
     console.log('📋 Filas de datos:', dataRows.length)
     
-    // Convertir a objetos
+    // Convertir a objetos y normalizar fechas
     const data = dataRows.map((row, index) => {
       const obj = {}
-      headers.forEach((header, index) => {
-        obj[header] = row[index] || ''
+      headers.forEach((header, headerIndex) => {
+        let value = row[headerIndex] || ''
+        
+        // Convertir números seriales de Excel/Google Sheets a fechas en formato DD/MM/YYYY
+        if (header === 'Fechas' && value) {
+          value = normalizeDateToDDMMYYYY(value)
+        }
+        
+        obj[header] = value
       })
       return obj
     }).filter(obj => {
@@ -1721,8 +1815,20 @@ app.put('/api/update-order-status', async (req, res) => {
           while (dataRows[orderIndex].length <= columnIndex) {
             dataRows[orderIndex].push('')
           }
-          dataRows[orderIndex][columnIndex] = additionalData[fieldName]
-          console.log(`✅ Actualizado ${columnName} (columna ${columnIndex}, header: "${headers[columnIndex]}"): ${additionalData[fieldName]}`)
+          
+          // Normalizar fechas a formato DD/MM/YYYY y forzar como texto
+          let valueToSet = additionalData[fieldName]
+          if (fieldName === 'fecha' && valueToSet) {
+            valueToSet = normalizeDateToDDMMYYYY(valueToSet)
+            // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
+            if (valueToSet) {
+              valueToSet = `'${valueToSet}`
+            }
+            console.log(`  📅 Fecha normalizada en actualización: "${additionalData[fieldName]}" -> "${valueToSet}"`)
+          }
+          
+          dataRows[orderIndex][columnIndex] = valueToSet
+          console.log(`✅ Actualizado ${columnName} (columna ${columnIndex}, header: "${headers[columnIndex]}"): ${valueToSet}`)
         } else {
           console.log(`⚠️ Columna "${columnName}" no encontrada en el sheet`)
           // Buscar columnas similares para tiempo_espera
@@ -2995,7 +3101,14 @@ app.get('/api/read-client-orders', async (req, res) => {
     const data = dataRows.map(row => {
       const obj = {}
       headers.forEach((header, index) => {
-        obj[header] = row[index] || ''
+        let value = row[index] || ''
+        
+        // Convertir números seriales de Excel/Google Sheets a fechas en formato DD/MM/YYYY
+        if (header === 'Fechas' && value) {
+          value = normalizeDateToDDMMYYYY(value)
+        }
+        
+        obj[header] = value
       })
       return obj
     })
@@ -3534,7 +3647,11 @@ app.post('/api/cliente/crear-pedido', async (req, res) => {
       'Método pago pago': '',
       'Biker': '',
       'WhatsApp': '',
-      'Fechas': fechaDeseada || '',
+      'Fechas': (() => {
+        const fechaNormalizada = normalizeDateToDDMMYYYY(fechaDeseada)
+        // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
+        return fechaNormalizada ? `'${fechaNormalizada}` : ''
+      })(),
       'Hora Ini': horaDeseada || '',
       'Hora Fin': '',
       'Duracion': '',

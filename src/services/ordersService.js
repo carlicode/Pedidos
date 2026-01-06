@@ -122,22 +122,48 @@ export const mapRowToOrder = (rowObj, index = 0, initialOrder = {}, operadorDefa
  * @returns {Object} Objeto filtrado con los campos para Google Sheets
  */
 export const filterOrderForSheet = (order) => {
-  // Función para convertir fecha del formulario (YYYY-MM-DD) a formato DD/MM/YYYY
+  // Función para convertir fecha del formulario a formato DD/MM/YYYY
+  // Normaliza cualquier formato de fecha a DD/MM/YYYY (igual que Fecha Registro)
   const formatDateForSheet = (dateString) => {
-    if (!dateString) return ''
+    if (!dateString || typeof dateString !== 'string') return ''
+    
+    const trimmed = dateString.trim()
+    if (!trimmed) return ''
+    
     try {
-      // Si ya está en formato DD/MM/YYYY, devolverla tal como está
-      if (dateString.includes('/')) return dateString
-      
-      // Si viene del formulario en formato YYYY-MM-DD, convertir sin zona horaria
-      if (dateString.includes('-')) {
-        const [year, month, day] = dateString.split('-')
-        return `${day}/${month}/${year}`
+      // Si ya está en formato DD/MM/YYYY, devolverlo tal cual
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+        return trimmed
       }
       
-      return dateString // Si no coincide ningún formato, devolver original
+      // Si viene en formato YYYY-MM-DD (del input type="date"), convertir a DD/MM/YYYY
+      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+        const [year, month, day] = trimmed.split('-')
+        // Usar el mismo formato que Fecha Registro
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
+      }
+      
+      // Si es un número (Excel serial date), convertir usando la función de conversión
+      if (!isNaN(parseFloat(trimmed)) && isFinite(trimmed) && !trimmed.includes('/') && !trimmed.includes('-')) {
+        return convertExcelDate(trimmed)
+      }
+      
+      // Intentar crear un Date object y convertir usando toLocaleDateString (igual que el servidor)
+      const date = new Date(trimmed)
+      if (!isNaN(date.getTime())) {
+        // Usar el mismo método que el servidor para consistencia
+        return date.toLocaleDateString('es-BO', { 
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        })
+      }
+      
+      // Si no se pudo parsear, devolver string vacío
+      return ''
     } catch (error) {
-      return dateString // Si hay error, devolver el valor original
+      console.warn('Error formateando fecha para sheet:', dateString, error)
+      return ''
     }
   }
 
@@ -215,13 +241,14 @@ export const filterOrderForSheet = (order) => {
     'WhatsApp': order.whatsapp,
     'Fechas': (() => {
       const fechaConvertida = formatDateForSheet(order.fecha) || currentDate
-      return `'${fechaConvertida}` // Forzar como texto
+      // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
+      return fechaConvertida ? `'${fechaConvertida}` : ''
     })(),
     'Hora Ini': `'${formatTimeForSheet(order.hora_ini)}`,
     'Hora Fin': `'${formatTimeForSheet(order.hora_fin)}`,
     'Duracion': order.duracion,
-    'Estado': order.estado,
-    'Estado de pago': order.estado_pago,
+    'Estado': order.estado || 'Pendiente',
+    'Estado de pago': order.estado_pago || 'Debe Cliente',
     'Observaciones': order.observaciones,
     'Pago biker': order.pago_biker,
     'Dia de la semana': order.dia_semana,

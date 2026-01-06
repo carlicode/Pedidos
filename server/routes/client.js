@@ -20,7 +20,7 @@ function getInventarioSheetId() {
 }
 
 function getServiceAccountFile() {
-  return process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-1d5503cf3b22.json';
+  return process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '../beezero-62dea82962da.json';
 }
 
 function getPort() {
@@ -38,7 +38,7 @@ function getAuthClient() {
   if (SERVICE_ACCOUNT_FILE.startsWith('..')) {
     // Si es relativa, resolver desde server/routes/ -> server/ -> raíz
     // __dirname = /Users/.../Pedidos/server/routes
-    // Necesitamos: /Users/.../Pedidos/beezero-1d5503cf3b22.json
+    // Necesitamos: /Users/.../Pedidos/beezero-62dea82962da.json
     serviceAccountPath = path.join(__dirname, '..', '..', SERVICE_ACCOUNT_FILE.replace(/^\.\.\//, ''));
   } else {
     serviceAccountPath = SERVICE_ACCOUNT_FILE;
