@@ -4,7 +4,7 @@ export const users = [
   {
     id: 1,
     username: 'ana',
-    password: 'ana7384',
+    password: 'ana8392',
     name: 'Ana',
     role: 'operador',
     email: 'ana@pedidos.com'
@@ -12,7 +12,7 @@ export const users = [
   {
     id: 2,
     username: 'fabri',
-    password: 'fabri8142',
+    password: 'fabri5167',
     name: 'Fabri',
     role: 'operador',
     email: 'fabri@pedidos.com'
@@ -20,7 +20,7 @@ export const users = [
   {
     id: 3,
     username: 'migue',
-    password: 'migue4157',
+    password: 'migue9483',
     name: 'Miguel',
     role: 'operador',
     email: 'migue@pedidos.com'
@@ -28,7 +28,7 @@ export const users = [
   {
     id: 4,
     username: 'paul',
-    password: 'paul6829',
+    password: 'paul3572',
     name: 'Paul',
     role: 'operador',
     email: 'paul@pedidos.com'
@@ -37,7 +37,7 @@ export const users = [
   {
     id: 5,
     username: 'miguel',
-    password: 'miguel9184',
+    password: 'miguel3847',
     name: 'Miguel',
     role: 'admin',
     email: 'miguel@pedidos.com'
@@ -45,7 +45,7 @@ export const users = [
   {
     id: 6,
     username: 'andi',
-    password: 'andi7849',
+    password: 'andi5921',
     name: 'Andi',
     role: 'admin',
     email: 'andi@pedidos.com'
@@ -53,7 +53,7 @@ export const users = [
   {
     id: 7,
     username: 'ale',
-    password: 'ale5926',
+    password: 'ale7264',
     name: 'Ale',
     role: 'admin',
     email: 'ale@pedidos.com'
@@ -61,7 +61,7 @@ export const users = [
   {
     id: 8,
     username: 'carli',
-    password: 'carli3471',
+    password: 'carli1859',
     name: 'Carli',
     role: 'admin',
     email: 'carli@pedidos.com'
@@ -69,7 +69,7 @@ export const users = [
   {
     id: 9,
     username: 'paulo',
-    password: 'paulo9263',
+    password: 'paulo4638',
     name: 'Paulo',
     role: 'admin',
     email: 'paulo@pedidos.com'
@@ -77,7 +77,7 @@ export const users = [
   {
     id: 10,
     username: 'admin',
-    password: 'admin3562',
+    password: 'admin2745',
     name: 'Admin',
     role: 'admin',
     email: 'admin@pedidos.com'
