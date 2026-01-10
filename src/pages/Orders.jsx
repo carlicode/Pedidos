@@ -15,6 +15,8 @@ import { getBackendUrl, apiFetch, getApiUrl } from '../utils/api.js'
 import notificationSound from '../music/new-notification.mp3'
 import { useTimer } from '../hooks/useTimer.js'
 import { useOrderLogging } from '../hooks/useOrderLogging.js'
+import { useWhatsApp } from '../hooks/useWhatsApp.js'
+import { useKanban } from '../hooks/useKanban.js'
 import { 
   getBoliviaTime, 
   getBoliviaDateTime, 
@@ -79,7 +81,11 @@ import {
   getClienteInfo,
   calculateDayOfWeek
 } from '../utils/dataHelpers.js'
-import { formatDateForDisplay } from '../utils/formatHelpers.js'
+import { generateWhatsAppURL } from '../utils/whatsAppUtils.js'
+import MultiDateCalendar from '../components/orders/MultiDateCalendar.jsx'
+import MissingDataModal from '../components/orders/MissingDataModal.jsx'
+import { generarPDFConPlantilla, generatePDFResumen, generarPDFConHTML } from '../services/pdfService.js'
+import { formatToStandardDate, prepareDateForSheet, normalizeOrderDate, formatDateForDisplay, convertToISO } from '../services/dateService.js'
 
 // ===== FUNCIONES DE UTILIDAD MOVIDAS A dateUtils.js =====
 // Las funciones de fecha y hora boliviana ahora se importan desde ../utils/dateUtils.js
@@ -143,9 +149,8 @@ export default function Orders() {
   const [orders, setOrders] = useState([])
   const [filter, setFilter] = useState('')
   
-  // Estado para el mensaje de WhatsApp editable
-  const [whatsappMessage, setWhatsappMessage] = useState('')
-  const [whatsappMessageEdited, setWhatsappMessageEdited] = useState(false)
+  // Hook de WhatsApp para gestionar mensajes
+  const { whatsappMessage, whatsappMessageEdited, setWhatsappMessage, setWhatsappMessageEdited, resetWhatsappMessage } = useWhatsApp(form)
   
   // Referencia para el audio de notificación
   const notificationAudioRef = useRef(null)
@@ -293,6 +298,27 @@ export default function Orders() {
   const [duplicateModal, setDuplicateModal] = useState({ show: false, order: null, selectedDates: [], isDuplicating: false })
   const [duplicateSuccessModal, setDuplicateSuccessModal] = useState({ show: false, count: 0, lastDate: null })
   const [missingDataModal, setMissingDataModal] = useState({ show: false, order: null })
+  
+  // Función de notificación (debe estar definida antes de usarse)
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type })
+  }
+  
+  // Hook de Kanban para gestionar drag & drop y cambios de estado
+  const kanbanHook = useKanban(
+    orders,
+    setOrders,
+    logToCSV,
+    showNotification,
+    setMissingDataModal,
+    setDeliveryModal
+  )
+  
+  // Wrapper para handleDrop que pasa las dependencias adicionales
+  const handleDragStart = kanbanHook.handleDragStart
+  const handleDragOver = kanbanHook.handleDragOver
+  const handleStatusChange = kanbanHook.handleStatusChange
+  const handleDrop = (e, newEstado) => kanbanHook.handleDrop(e, newEstado, setCancelModal, getBoliviaTimeString)
   // Estado para modo edición (reutiliza el formulario de agregar)
   const [editingOrder, setEditingOrder] = useState(null)
   // Nuevos estados para manejar entrada manual de direcciones
@@ -500,29 +526,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     showNotification('✅ Formulario auto-rellenado con datos de la cotización', 'success')
   }
 
-  // Actualizar mensaje de WhatsApp automáticamente cuando cambien los campos relevantes
-  useEffect(() => {
-    // Solo actualizar si el usuario no ha editado manualmente el mensaje
-    if (!whatsappMessageEdited && (form.cliente || form.recojo || form.entrega)) {
-      const newMessage = buildWhatsAppMessage(form)
-      setWhatsappMessage(newMessage)
-    }
-  }, [
-    form.cliente, 
-    form.recojo, 
-    form.entrega, 
-    form.direccion_recojo,
-    form.info_direccion_recojo,
-    form.direccion_entrega,
-    form.info_direccion_entrega,
-    form.detalles_carrera,
-    form.precio_bs,
-    form.metodo_pago,
-    form.cobro_pago,
-    form.monto_cobro_pago,
-    form.descripcion_cobro_pago,
-    whatsappMessageEdited
-  ])
+  // La actualización automática del mensaje de WhatsApp ahora se maneja en el hook useWhatsApp
 
   // Función para detectar si un valor es un enlace válido de Google Maps
   // hasValidMapsLink ahora se importa desde mapsUtils.js
@@ -584,15 +588,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Pre-cargar formulario cuando se activa modo edición
   useEffect(() => {
     if (editingOrder) {
-
-      // Convertir fecha del formato DD/MM/YYYY a yyyy-MM-dd para el input date
-      let fechaConvertida = editingOrder.fecha
-      if (fechaConvertida && fechaConvertida.includes('/')) {
-        // Si la fecha está en formato DD/MM/YYYY, convertir a yyyy-MM-dd
-        const [dia, mes, anio] = fechaConvertida.split('/')
-        fechaConvertida = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
-
-      }
+      // Convertir fecha del formato DD/MM/YYYY a yyyy-MM-dd para el input date usando dateService
+      const fechaConvertida = convertToISO(editingOrder.fecha) || editingOrder.fecha
       
       // Asegurar que tiempo_espera se incluya con todas sus variantes posibles
       const tiempoEspera = editingOrder.tiempo_espera || editingOrder['Tiempo de espera'] || editingOrder['Tiempo de Espera'] || ''
@@ -666,10 +663,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       setEntregaManual(false)
     }
   }, [activeTab])
-
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type })
-  }
 
   const handleDeliveryComplete = async (deliveryData) => {
     try {
@@ -869,8 +862,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     setEditingOrder(null)
     setForm(initialOrder)
     // Resetear el mensaje de WhatsApp
-    setWhatsappMessage('')
-    setWhatsappMessageEdited(false)
+    resetWhatsappMessage()
     setPrecioEditadoManualmente(false)
     setRecojoManual(false)
     setEntregaManual(false)
@@ -903,340 +895,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     })
   }
 
-  // Componente de calendario con selección múltiple
-  const MultiDateCalendar = ({ selectedDates, onDateSelect, minDate }) => {
-    const [currentMonth, setCurrentMonth] = useState(new Date())
-    const today = new Date()
-    
-    const getDaysInMonth = (date) => {
-      const year = date.getFullYear()
-      const month = date.getMonth()
-      const firstDay = new Date(year, month, 1)
-      const lastDay = new Date(year, month + 1, 0)
-      const daysInMonth = lastDay.getDate()
-      const startingDayOfWeek = firstDay.getDay()
-      
-      const days = []
-      
-      // Días del mes anterior (para completar la semana)
-      for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-        const prevDate = new Date(year, month, -i)
-        days.push({
-          date: prevDate,
-          isCurrentMonth: false,
-          isSelectable: false
-        })
-      }
-      
-      // Días del mes actual
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day)
-        const isPast = date < new Date(minDate || today.toISOString().split('T')[0])
-        days.push({
-          date,
-          isCurrentMonth: true,
-          isSelectable: !isPast,
-          isToday: date.toDateString() === today.toDateString()
-        })
-      }
-      
-      // Días del mes siguiente (para completar la semana)
-      const remainingDays = 42 - days.length // 6 semanas * 7 días
-      for (let day = 1; day <= remainingDays; day++) {
-        const nextDate = new Date(year, month + 1, day)
-        days.push({
-          date: nextDate,
-          isCurrentMonth: false,
-          isSelectable: false
-        })
-      }
-      
-      return days
-    }
-    
-    const navigateMonth = (direction) => {
-      setCurrentMonth(prev => {
-        const newDate = new Date(prev)
-        newDate.setMonth(prev.getMonth() + direction)
-        return newDate
+  // MultiDateCalendar ahora se importa desde components/orders/MultiDateCalendar.jsx
+
+  // Las funciones de Kanban (handleDragStart, handleDragOver, handleDrop, handleStatusChange) 
+  // ahora se manejan en el hook useKanban
+
+  // Llenar el formulario cuando se entra en modo edición
+  useEffect(() => {
+    if (editingOrder) {
+      // Llenar el formulario con los datos del pedido a editar
+      setForm({
+        ...editingOrder,
+        // Asegurar que los campos de info adicional se mapeen correctamente
+        info_direccion_recojo: editingOrder.info_direccion_recojo || editingOrder['Info. Adicional Recojo'] || '',
+        info_direccion_entrega: editingOrder.info_direccion_entrega || editingOrder['Info. Adicional Entrega'] || ''
       })
     }
-    
-    const handleDateClick = (date) => {
-      const dateString = date.toISOString().split('T')[0]
-      onDateSelect(dateString)
-    }
-    
-    const isDateSelected = (date) => {
-      const dateString = date.toISOString().split('T')[0]
-      return selectedDates.includes(dateString)
-    }
-    
-    const days = getDaysInMonth(currentMonth)
-    const monthNames = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ]
-    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-    
-    return (
-      <div className="multi-date-calendar">
-        {/* Header del calendario */}
-        <div className="calendar-header" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-          padding: '0 4px'
-        }}>
-          <button
-            type="button"
-            onClick={() => navigateMonth(-1)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '16px',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              color: '#6c757d'
-            }}
-          >
-            ‹
-          </button>
-          <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-          </h4>
-          <button
-            type="button"
-            onClick={() => navigateMonth(1)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '16px',
-              cursor: 'pointer',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              color: '#6c757d'
-            }}
-          >
-            ›
-          </button>
-        </div>
-        
-        {/* Días de la semana */}
-        <div className="calendar-weekdays" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '1px',
-          marginBottom: '6px'
-        }}>
-          {dayNames.map(day => (
-            <div key={day} style={{
-              textAlign: 'center',
-              fontSize: '10px',
-              fontWeight: '600',
-              color: '#6c757d',
-              padding: '4px 2px'
-            }}>
-              {day}
-            </div>
-          ))}
-        </div>
-        
-        {/* Días del calendario */}
-        <div className="calendar-days" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '1px'
-        }}>
-          {days.map((day, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => day.isSelectable && handleDateClick(day.date)}
-              disabled={!day.isSelectable}
-              style={{
-                aspectRatio: '1',
-                border: day.isToday && !isDateSelected(day.date) ? '1px solid #007bff' : '1px solid #e9ecef',
-                borderRadius: '3px',
-                fontSize: '12px',
-                cursor: day.isSelectable ? 'pointer' : 'default',
-                backgroundColor: !day.isSelectable 
-                  ? '#f8f9fa'
-                  : isDateSelected(day.date)
-                    ? '#007bff'
-                    : day.isToday
-                      ? '#e3f2fd'
-                      : 'white',
-                color: !day.isSelectable
-                  ? '#adb5bd'
-                  : isDateSelected(day.date)
-                    ? 'white'
-                    : day.isToday
-                      ? '#007bff'
-                      : '#212529',
-                fontWeight: day.isToday ? 'bold' : 'normal',
-                transition: 'all 0.2s ease',
-                minHeight: '28px'
-              }}
-              onMouseEnter={(e) => {
-                if (day.isSelectable && !isDateSelected(day.date)) {
-                  e.target.style.backgroundColor = '#f8f9fa'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (day.isSelectable && !isDateSelected(day.date)) {
-                  e.target.style.backgroundColor = day.isToday ? '#e3f2fd' : 'white'
-                }
-              }}
-            >
-              {day.date.getDate()}
-            </button>
-          ))}
-        </div>
-        
-        {/* Leyenda */}
-        <div style={{
-          marginTop: '8px',
-          fontSize: '10px',
-          color: '#6c757d',
-          textAlign: 'center'
-        }}>
-          💡 Haz clic en las fechas para seleccionarlas
-        </div>
-      </div>
-    )
-  }
-
-  // Drag & Drop functions
-  const handleDragStart = (e, order) => {
-    e.dataTransfer.setData('application/json', JSON.stringify(order))
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
-
-  // Función para manejar cambios de estado con información adicional
-  const handleStatusChange = async (orderId, newEstado, additionalData = {}) => {
-    try {
-
-      // Actualizar estado localmente primero
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === orderId 
-            ? { 
-                ...order, 
-                estado: newEstado,
-                ...additionalData // Incluir datos adicionales como hora_fin, observaciones, etc.
-              }
-            : order
-        )
-      )
-      
-      // Actualizar en Google Sheet
-      try {
-        const response = await fetch('/api/update-order-status', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            orderId: orderId,
-            newStatus: newEstado,
-            additionalData: additionalData
-          })
-        })
-        
-        if (response.ok) {
-          const result = await response.json()
-
-          showNotification(`✅ Pedido #${orderId} actualizado a ${newEstado} en Google Sheet`, 'success')
-        } else {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Error actualizando en Google Sheet')
-        }
-      } catch (sheetError) {
-
-        showNotification(`⚠️ Estado actualizado localmente, pero error en Google Sheet: ${sheetError.message}`, 'warning')
-      }
-      
-      // Log del cambio de estado
-      await logToCSV('order_status_change', { 
-        orderId: orderId,
-        oldStatus: orders.find(o => o.id === orderId)?.estado,
-        newStatus: newEstado,
-        additionalData: additionalData
-      }, 'info')
-      
-    } catch (error) {
-
-      showNotification(`❌ Error al cambiar estado del pedido #${orderId}`, 'error')
-    }
-  }
-
-  const handleDrop = async (e, newEstado) => {
-    e.preventDefault()
-    
-    try {
-      const orderData = JSON.parse(e.dataTransfer.getData('application/json'))
-      
-      if (orderData.estado === newEstado) return // No cambiar si es el mismo estado
-      
-      // Log: Cambio de estado de pedido
-      await logToCSV('order_status_change', { 
-        orderId: orderData.id,
-        oldStatus: orderData.estado,
-        newStatus: newEstado,
-        orderData: orderData
-      }, 'info')
-      
-      // Si se mueve a "Entregado", validar datos críticos primero
-      if (newEstado === 'Entregado') {
-        // Verificar si faltan datos críticos
-        const sinBiker = !orderData.biker || orderData.biker.trim() === '' || orderData.biker === 'ASIGNAR BIKER'
-        const sinEntrega = !orderData.entrega || orderData.entrega.trim() === ''
-        const sinPrecio = !orderData.precio_bs || parseFloat(orderData.precio_bs) <= 0
-        const sinDistancia = !orderData.distancia_km || parseFloat(orderData.distancia_km) <= 0
-        
-        if (sinBiker || sinEntrega || sinPrecio || sinDistancia) {
-          // Mostrar modal de advertencia
-          setMissingDataModal({ show: true, order: orderData })
-          return
-        }
-        
-        // Si todos los datos están completos, abrir modal de entrega
-        setDeliveryModal({ show: true, order: orderData })
-        return
-      }
-      
-      // Si se mueve a "Cancelado", abrir modal para especificar motivo
-      if (newEstado === 'Cancelado') {
-        setCancelModal({ show: true, order: orderData })
-        return
-      }
-      
-      // Si se mueve a "En carrera", actualizar automáticamente con hora de inicio si no la tiene
-      let additionalData = {}
-      if (newEstado === 'En carrera' && !orderData.hora_ini) {
-        const timeString = getBoliviaTimeString() // HH:MM format en hora Bolivia
-        additionalData.hora_ini = timeString
-        showNotification(`🚚 Pedido en carrera - Hora de inicio: ${timeString}`, 'success')
-      }
-      
-      showNotification(`🔄 Moviendo pedido #${orderData.id} a ${newEstado}...`, 'info')
-      
-      // Usar handleStatusChange para actualizar tanto local como en Google Sheet
-      await handleStatusChange(orderData.id, newEstado, additionalData)
-      
-    } catch (err) {
-
-      showNotification('❌ Error al actualizar estado', 'error')
-    }
-  }
+  }, [editingOrder])
 
   // Auto-sync cuando se cambie a la pestaña "Ver pedidos" o "Cobros/Pagos" (solo si no hay datos)
   useEffect(() => {
@@ -1398,1158 +1073,24 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
   }
 
-  // Función para generar PDF usando la plantilla como base
-  const generarPDFConPlantilla = async (datosFiltrados, fechaInicio, fechaFin) => {
-    try {
-
-      // Crear PDF
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      
-      // Cargar la plantilla como imagen de fondo
-      const plantillaImg = new Image()
-      
-      plantillaImg.onload = () => {
-        try {
-          // Agregar la plantilla como imagen de fondo (A4: 210x297 mm)
-          pdf.addImage(plantillaImg, 'PNG', 0, 0, 210, 297)
-          
-          // Configurar fuente y colores
-          pdf.setFont('helvetica')
-          pdf.setFontSize(12)
-          pdf.setTextColor(51, 51, 51) // #333
-          
-          // Agregar contenido del reporte encima de la plantilla
-          // Título del reporte
-          pdf.setFontSize(18)
-          pdf.setTextColor(40, 167, 69) // #28a745 (verde)
-          pdf.text('💰 RESUMEN FINANCIERO', 105, 50, { align: 'center' })
-          
-          // Información del cliente
-          pdf.setFontSize(14)
-          pdf.setTextColor(44, 62, 80) // #2c3e50
-          pdf.text(`Cliente: ${datosFiltrados.cliente}`, 20, 70)
-          
-          // Fecha de generación
-          pdf.setFontSize(12)
-          pdf.setTextColor(108, 117, 125) // #6c757d
-          const fechaGeneracion = new Date().toLocaleDateString('es-BO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-          pdf.text(`Fecha de generación: ${fechaGeneracion}`, 20, 80)
-          
-          // Período del filtro
-          if (fechaInicio || fechaFin) {
-            let periodoTexto = '📅 Período: '
-            if (fechaInicio && fechaFin) {
-              periodoTexto += `${new Date(fechaInicio).toLocaleDateString('es-BO')} hasta ${new Date(fechaFin).toLocaleDateString('es-BO')}`
-            } else if (fechaInicio) {
-              periodoTexto += `desde ${new Date(fechaInicio).toLocaleDateString('es-BO')}`
-            } else if (fechaFin) {
-              periodoTexto += `hasta ${new Date(fechaFin).toLocaleDateString('es-BO')}`
-            }
-            pdf.text(periodoTexto, 20, 90)
-          }
-          
-          // Resumen de totales
-          pdf.setFontSize(16)
-          pdf.setTextColor(40, 167, 69) // Verde
-          pdf.text('RESUMEN DE TOTALES', 105, 110, { align: 'center' })
-          
-          // Grid de totales
-          const startX = 20
-          const startY = 125
-          const cardWidth = 50
-          const cardHeight = 30
-          const spacing = 10
-          
-          // Total Cobros
-          pdf.setFillColor(212, 237, 218) // #d4edda (verde claro)
-          pdf.rect(startX, startY, cardWidth, cardHeight, 'F')
-          pdf.setTextColor(21, 87, 36) // #155724
-          pdf.setFontSize(10)
-          pdf.text('COBROS', startX + cardWidth/2, startY + 8, { align: 'center' })
-          pdf.setFontSize(14)
-          pdf.text(`Bs${datosFiltrados.subtotalCobros.toFixed(2)}`, startX + cardWidth/2, startY + 20, { align: 'center' })
-          
-          // Total Carreras
-          pdf.setFillColor(255, 243, 205) // #fff3cd (amarillo claro)
-          pdf.rect(startX + cardWidth + spacing, startY, cardWidth, cardHeight, 'F')
-          pdf.setTextColor(133, 100, 4) // #856404
-          pdf.setFontSize(10)
-          pdf.text('CARRERAS', startX + cardWidth + spacing + cardWidth/2, startY + 8, { align: 'center' })
-          pdf.setFontSize(14)
-          pdf.text(`Bs${datosFiltrados.subtotalCarreras.toFixed(2)}`, startX + cardWidth + spacing + cardWidth/2, startY + 20, { align: 'center' })
-          
-          // Total Pagos
-          pdf.setFillColor(248, 215, 218) // #f8d7da (rojo claro)
-          pdf.rect(startX + (cardWidth + spacing) * 2, startY, cardWidth, cardHeight, 'F')
-          pdf.setTextColor(114, 28, 36) // #721c24
-          pdf.setFontSize(10)
-          pdf.text('PAGOS', startX + (cardWidth + spacing) * 2 + cardWidth/2, startY + 8, { align: 'center' })
-          pdf.setFontSize(14)
-          pdf.text(`Bs${datosFiltrados.subtotalPagos.toFixed(2)}`, startX + (cardWidth + spacing) * 2 + cardWidth/2, startY + 20, { align: 'center' })
-          
-          // Subtotal General
-          pdf.setFillColor(226, 227, 229) // #e2e3e5 (gris claro)
-          pdf.rect(startX + (cardWidth + spacing) * 3, startY, cardWidth, cardHeight, 'F')
-          pdf.setTextColor(56, 61, 65) // #383d41
-          pdf.setFontSize(10)
-          pdf.text('SUBTOTAL', startX + (cardWidth + spacing) * 3 + cardWidth/2, startY + 8, { align: 'center' })
-          pdf.setFontSize(14)
-          pdf.text(`Bs${datosFiltrados.subtotalGeneral.toFixed(2)}`, startX + (cardWidth + spacing) * 3 + cardWidth/2, startY + 20, { align: 'center' })
-          
-          // Descuento (solo si existe)
-          if (datosFiltrados.porcentajeDescuento > 0) {
-            pdf.setFillColor(248, 215, 218) // #f8d7da (rojo claro)
-            pdf.rect(startX + (cardWidth + spacing) * 4, startY, cardWidth, cardHeight, 'F')
-            pdf.setTextColor(114, 28, 36) // #721c24
-            pdf.setFontSize(10)
-            pdf.text(`DESC ${datosFiltrados.porcentajeDescuento}%`, startX + (cardWidth + spacing) * 4 + cardWidth/2, startY + 8, { align: 'center' })
-            pdf.setFontSize(14)
-            pdf.text(`-Bs${datosFiltrados.montoDescuento.toFixed(2)}`, startX + (cardWidth + spacing) * 4 + cardWidth/2, startY + 20, { align: 'center' })
-          }
-          
-          // Saldo Final
-          const saldoColor = datosFiltrados.saldo >= 0 ? [212, 237, 218] : [248, 215, 218]
-          const saldoTextColor = datosFiltrados.saldo >= 0 ? [21, 87, 36] : [114, 28, 36]
-          pdf.setFillColor(...saldoColor)
-          pdf.rect(startX + (cardWidth + spacing) * (datosFiltrados.porcentajeDescuento > 0 ? 5 : 4), startY, cardWidth, cardHeight, 'F')
-          pdf.setTextColor(...saldoTextColor)
-          pdf.setFontSize(10)
-          pdf.text(datosFiltrados.saldo >= 0 ? 'NOS DEBE' : 'LE DEBEMOS', startX + (cardWidth + spacing) * (datosFiltrados.porcentajeDescuento > 0 ? 5 : 4) + cardWidth/2, startY + 8, { align: 'center' })
-          pdf.setFontSize(14)
-          pdf.text(`Bs${Math.abs(datosFiltrados.saldo).toFixed(2)}`, startX + (cardWidth + spacing) * (datosFiltrados.porcentajeDescuento > 0 ? 5 : 4) + cardWidth/2, startY + 20, { align: 'center' })
-          
-          // Tabla de transacciones
-          pdf.setFontSize(14)
-          pdf.setTextColor(40, 167, 69) // Verde
-          pdf.text('DETALLE DE TRANSACCIONES', 105, 170, { align: 'center' })
-          
-          // Encabezados de tabla
-          pdf.setFontSize(10)
-          pdf.setTextColor(255, 255, 255) // Blanco
-          pdf.setFillColor(40, 167, 69) // Verde
-          const tableStartY = 180
-          const colWidths = [15, 25, 25, 25, 30, 40, 25, 25]
-          let currentX = 20
-          
-          // Encabezados
-          const headers = ['Nº', 'FECHA', 'TIPO', 'MONTO', 'CARRERA', 'DESCRIPCIÓN', 'BIKER', 'ESTADO']
-          headers.forEach((header, index) => {
-            pdf.rect(currentX, tableStartY, colWidths[index], 10, 'F')
-            pdf.text(header, currentX + colWidths[index]/2, tableStartY + 7, { align: 'center' })
-            currentX += colWidths[index]
-          })
-          
-          // Datos de la tabla
-          pdf.setTextColor(51, 51, 51) // #333
-          pdf.setFontSize(9)
-          let currentY = tableStartY + 15
-          
-          datosFiltrados.pedidos.forEach((pedido, index) => {
-            if (currentY > 270) { // Nueva página si no hay espacio
-              pdf.addPage()
-              currentY = 20
-              // Agregar plantilla en nueva página
-              pdf.addImage(plantillaImg, 'PNG', 0, 0, 210, 297)
-            }
-            
-            currentX = 20
-            const rowData = [
-              (index + 1).toString(),
-              pedido.fecha || 'N/A',
-              pedido.cobro_pago || 'N/A',
-              `Bs${pedido.monto_cobro_pago || '0.00'}`,
-              `Bs${pedido.precio_bs || '0.00'}`,
-              pedido.detalles_carrera || 'N/A',
-              pedido.biker || 'N/A',
-              '✅ Entregado'
-            ]
-            
-            rowData.forEach((cell, cellIndex) => {
-              const bgColor = pedido.cobro_pago === 'Cobro' ? [212, 237, 218] : [248, 215, 218]
-              pdf.setFillColor(...bgColor)
-              pdf.rect(currentX, currentY, colWidths[cellIndex], 8, 'F')
-              pdf.text(cell, currentX + colWidths[cellIndex]/2, currentY + 5, { align: 'center' })
-              currentX += colWidths[cellIndex]
-            })
-            
-            currentY += 10
-          })
-          
-          // Guardar el PDF
-          const nombreArchivo = `Resumen_${datosFiltrados.cliente.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
-          pdf.save(nombreArchivo)
-          showNotification('✅ PDF generado exitosamente con plantilla', 'success')
-
-        } catch (error) {
-
-          showNotification('⚠️ Error al usar plantilla, usando modo HTML', 'warning')
-          // Fallback a HTML si hay error
-          generarPDFConHTML(datosFiltrados, fechaInicio, fechaFin)
-        }
-      }
-      
-      plantillaImg.onerror = () => {
-
-        showNotification('⚠️ No se pudo cargar la plantilla, usando modo HTML', 'warning')
-        generarPDFConHTML(datosFiltrados, fechaInicio, fechaFin)
-      }
-      
-      // Intentar cargar la plantilla desde la raíz del proyecto
-      plantillaImg.src = './plantilla.pdf'
-      
-    } catch (error) {
-
-      showNotification('⚠️ Error al usar plantilla, usando modo HTML', 'warning')
-      generarPDFConHTML(datosFiltrados, fechaInicio, fechaFin)
-    }
+  // Wrappers para las funciones de PDF (delegando al servicio)
+  const generarPDFConPlantillaWrapper = async (datosFiltrados, fechaInicio, fechaFin) => {
+    await generarPDFConPlantilla(datosFiltrados, fechaInicio, fechaFin, showNotification, generarPDFConHTMLWrapper)
   }
 
-  // Nueva función específica para PDF con descuento
-
-  const generatePDFResumen = async (clienteData, fechaInicio = null, fechaFin = null) => {
-    try {
-      showNotification('🔄 Generando PDF...', 'success')
-      
-      // Filtrar pedidos por fecha si se especifican filtros
-      let pedidosFiltrados = clienteData.pedidos
-      if (fechaInicio || fechaFin) {
-        pedidosFiltrados = clienteData.pedidos.filter(pedido => {
-          if (!pedido.fecha) return false
-          
-          const pedidoFecha = new Date(pedido.fecha)
-          const inicio = fechaInicio ? new Date(fechaInicio) : null
-          const fin = fechaFin ? new Date(fechaFin) : null
-          
-          if (inicio && fin) {
-            return pedidoFecha >= inicio && pedidoFecha <= fin
-          } else if (inicio) {
-            return pedidoFecha >= inicio
-          } else if (fin) {
-            return pedidoFecha <= fin
-          }
-          return true
-        })
-
-      }
-      
-      // Recalcular totales basados en pedidos filtrados
-      // Cobros: dinero que el biker cobró por servicios/productos vendidos
-      const totalCobros = pedidosFiltrados
-        .filter(p => p.cobro_pago === 'Cobro')
-        .reduce((sum, p) => sum + (parseFloat(p.monto_cobro_pago) || 0), 0)
-      
-      // Pagos: dinero que el biker pagó en nombre del cliente
-      const totalPagos = pedidosFiltrados
-        .filter(p => p.cobro_pago === 'Pago')
-        .reduce((sum, p) => sum + (parseFloat(p.monto_cobro_pago) || 0), 0)
-      
-      // Carreras: precio del servicio de delivery (siempre se suma, independiente de cobro/pago)
-      const totalCarreras = pedidosFiltrados
-        .filter(p => p.precio_bs && parseFloat(p.precio_bs) > 0)
-        .reduce((sum, p) => sum + (parseFloat(p.precio_bs) || 0), 0)
-      
-      // Calcular subtotales
-      const subtotalCobros = totalCobros
-      const subtotalPagos = totalPagos
-      const subtotalCarreras = totalCarreras
-      
-      // Calcular total general sin descuento
-      // Subtotal General = Carreras + Pagos - Cobros
-      // Cobros: dinero que cobramos del cliente (se debe devolver) → se resta
-      // Pagos: dinero que pagamos en nombre del cliente (se debe cobrar) → se suma
-      // Carreras: precio del servicio (se debe cobrar) → se suma
-      const subtotalGeneral = subtotalCarreras + subtotalPagos - subtotalCobros
-      
-      // Aplicar descuento individual del cliente solo a las CARRERAS (como porcentaje)
-      const porcentajeDescuento = descuentosClientes[clienteData.cliente] || 0
-      const montoDescuento = (subtotalCarreras * porcentajeDescuento) / 100
-      
-      // Saldo final con descuento aplicado solo a las carreras
-      const saldo = subtotalGeneral - montoDescuento
-      
-      // Crear objeto de datos filtrados
-      const datosFiltrados = {
-        ...clienteData,
-        pedidos: pedidosFiltrados,
-        totalCobros,
-        totalPagos,
-        totalCarreras,
-        subtotalCobros,
-        subtotalPagos,
-        subtotalCarreras,
-        subtotalGeneral,
-        porcentajeDescuento,
-        montoDescuento,
-        saldo
-      }
-      
-      // Intentar usar la plantilla PDF como base
-      let usePDFTemplate = false
-      
-      try {
-        // Verificar si existe la plantilla PDF
-        const templateResponse = await fetch('./plantilla.pdf')
-        if (templateResponse.ok) {
-          usePDFTemplate = true
-          showNotification('🎨 Usando plantilla PDF con membretado...', 'info')
-        }
-      } catch (error) {
-
-      }
-      
-      if (usePDFTemplate) {
-        // Generar PDF usando la plantilla como base
-        await generarPDFConPlantilla(datosFiltrados, fechaInicio, fechaFin)
-      } else {
-        // Usar plantilla HTML integrada como fallback
-        htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Resumen de Cobros y Pagos - ${datosFiltrados.cliente}${fechaInicio || fechaFin ? ' (Filtrado por Fecha)' : ''}</title>
-          <style>
-            @page { 
-              size: A4; 
-              margin: 1.5cm; 
-            }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              margin: 0; 
-              padding: 0;
-              background: white;
-              color: #333;
-              line-height: 1.3;
-            }
-            .header {
-              display: flex;
-              align-items: center;
-              margin-bottom: 20px;
-              padding-bottom: 15px;
-              border-bottom: 2px solid #28a745;
-            }
-            .logo {
-              display: flex;
-              align-items: center;
-              font-size: 24px;
-              font-weight: bold;
-              color: #28a745;
-            }
-            .logo-icon {
-              width: 30px;
-              height: 30px;
-              background: #28a745;
-              border-radius: 50%;
-              margin-right: 10px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: white;
-              font-size: 16px;
-            }
-            .document-title {
-              text-align: center;
-              font-size: 18px;
-              font-weight: bold;
-              color: #333;
-              margin: 20px 0;
-              background: #f8f9fa;
-              padding: 10px;
-              border-radius: 5px;
-            }
-            .client-info {
-              background: #e8f5e8;
-              padding: 12px;
-              border-radius: 5px;
-              margin-bottom: 20px;
-              border-left: 4px solid #28a745;
-            }
-            .client-name {
-              font-size: 16px;
-              font-weight: bold;
-              color: #155724;
-              margin-bottom: 5px;
-            }
-            .generation-date {
-              color: #6c757d;
-              font-size: 13px;
-            }
-            .summary-section {
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 5px;
-              margin-bottom: 20px;
-              border: 1px solid #dee2e6;
-            }
-            .summary-title {
-              font-size: 14px;
-              font-weight: bold;
-              color: #333;
-              margin-bottom: 10px;
-              text-align: center;
-            }
-            .summary-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-              gap: 10px;
-            }
-            .summary-item {
-              text-align: center;
-              padding: 10px;
-              border-radius: 4px;
-              border: 1px solid;
-            }
-            .cobros-item {
-              background: #d4edda;
-              border-color: #c3e6cb;
-              color: #155724;
-            }
-            .pagos-item {
-              background: #f8d7da;
-              border-color: #f5c6cb;
-              color: #721c24;
-            }
-            .saldo-item {
-                      background: ${datosFiltrados.saldo >= 0 ? '#d4edda' : '#f8d7da'};
-        border-color: ${datosFiltrados.saldo >= 0 ? '#c3e6cb' : '#f5c6cb'};
-        color: ${datosFiltrados.saldo >= 0 ? '#155724' : '#721c24'};
-            }
-            .summary-label {
-              font-size: 11px;
-              font-weight: bold;
-              margin-bottom: 3px;
-              text-transform: uppercase;
-            }
-            .summary-value {
-              font-size: 14px;
-              font-weight: bold;
-            }
-            .transactions-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 15px;
-              font-size: 11px;
-              border: 1px solid #dee2e6;
-            }
-            .transactions-table th {
-              background-color: #28a745;
-              color: white;
-              padding: 8px 6px;
-              text-align: left;
-              font-weight: bold;
-              border: 1px solid #1e7e34;
-              font-size: 10px;
-            }
-            .transactions-table td {
-              padding: 6px;
-              border: 1px solid #dee2e6;
-              vertical-align: top;
-              font-size: 10px;
-            }
-            .transactions-table tr:nth-child(even) {
-              background-color: #f8f9fa;
-            }
-            .cobro-row {
-              background-color: #d4edda !important;
-            }
-            .pago-row {
-              background-color: #f8d7da !important;
-            }
-            .total-section {
-              margin-top: 15px;
-              display: flex;
-              justify-content: space-between;
-              align-items: end;
-            }
-            .total-item {
-              text-align: center;
-              padding: 8px;
-              border: 1px solid #dee2e6;
-              border-radius: 4px;
-              background: #f8f9fa;
-              min-width: 80px;
-            }
-            .total-label {
-              font-size: 10px;
-              font-weight: bold;
-              margin-bottom: 3px;
-              text-transform: uppercase;
-            }
-            .total-value {
-              font-size: 12px;
-              font-weight: bold;
-              color: #28a745;
-            }
-            .footer {
-              margin-top: 20px;
-              text-align: center;
-              font-size: 10px;
-              color: #6c757d;
-              border-top: 1px solid #dee2e6;
-              padding-top: 10px;
-            }
-            .wave-footer {
-              margin-top: 15px;
-              height: 20px;
-              background: linear-gradient(45deg, #28a745, #20c997);
-              border-radius: 10px 10px 0 0;
-              opacity: 0.3;
-            }
-          </style>
-        </head>
-        <body>
-          <!-- Encabezado estilo BEEZY -->
-          <div class="header">
-            <div class="logo">
-              <div class="logo-icon">🚚</div>
-              BEEZY
-            </div>
-          </div>
-          
-          <!-- Título del documento -->
-          <div class="document-title">
-            RESUMEN DE COBROS Y PAGOS - ${datosFiltrados.cliente.toUpperCase()}
-            ${fechaInicio || fechaFin ? '<br/><small style="font-size: 14px; color: #6c757d;">📅 Filtrado por Período de Fechas</small>' : ''}
-          </div>
-          
-          <!-- Información del cliente -->
-          <div class="client-info">
-            <div class="client-name">Cliente: ${datosFiltrados.cliente}</div>
-            <div class="generation-date">Fecha de generación: ${new Date().toLocaleDateString('es-BO', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            })}</div>
-            ${fechaInicio || fechaFin ? `
-            <div class="date-range" style="color: #6c757d; font-size: 13px; margin-top: 5px;">
-              📅 Período: ${fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-BO') : 'Desde el inicio'} 
-              ${fechaFin ? `hasta ${new Date(fechaFin).toLocaleDateString('es-BO')}` : ''}
-            </div>
-            ` : ''}
-          </div>
-          
-          <!-- Resumen financiero -->
-          <div class="summary-section">
-            <div class="summary-title">RESUMEN FINANCIERO</div>
-            <div class="summary-grid">
-              <div class="summary-item cobros-item">
-                <div class="summary-label">Cobros</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalCobros.toFixed(2)}</div>
-              </div>
-              <div class="summary-item" style="background: #fff3cd; border-color: #ffeaa7; color: #856404;">
-                <div class="summary-label">Carreras</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalCarreras.toFixed(2)}</div>
-              </div>
-              ${datosFiltrados.porcentajeDescuento > 0 ? `
-              <div class="summary-item" style="background: #f8d7da; border-color: #f5c6cb; color: #721c24;">
-                <div class="summary-label">Descuento ${datosFiltrados.porcentajeDescuento}%</div>
-                <div class="summary-value">-Bs${datosFiltrados.montoDescuento.toFixed(2)}</div>
-              </div>
-              ` : ''}
-              <div class="summary-item" style="background: #e8f5e8; border-color: #c3e6cb; color: #155724;">
-                <div class="summary-label">Carreras Netas</div>
-                <div class="summary-value">Bs${datosFiltrados.carrerasConDescuento.toFixed(2)}</div>
-              </div>
-              <div class="summary-item pagos-item">
-                <div class="summary-label">Pagos</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalPagos.toFixed(2)}</div>
-              </div>
-              <div class="summary-item saldo-item">
-                <div class="summary-label">${datosFiltrados.saldo >= 0 ? 'Nos debe' : 'Le debemos'}</div>
-                <div class="summary-value">Bs${Math.abs(datosFiltrados.saldo).toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Tabla de transacciones -->
-          <table class="transactions-table">
-            <thead>
-              <tr>
-                <th>Nº</th>
-                <th>FECHA</th>
-                <th>TIPO</th>
-                <th>MONTO</th>
-                  <th>PRECIO CARRERA</th>
-                <th>DESCRIPCIÓN</th>
-                <th>BIKER</th>
-                <th>ESTADO</th>
-              </tr>
-            </thead>
-            <tbody>
-                ${datosFiltrados.pedidos.map((pedido, index) => `
-                <tr class="${pedido.cobro_pago === 'Cobro' ? 'cobro-row' : 'pago-row'}">
-                  <td>${index + 1}</td>
-                  <td>${pedido.fecha || 'N/A'}</td>
-                  <td><strong>${pedido.cobro_pago}</strong></td>
-                  <td><strong>Bs${pedido.monto_cobro_pago || '0.00'}</strong></td>
-                    <td><strong>Bs${pedido.precio_bs || '0.00'}</strong></td>
-                  <td>${pedido.detalles_carrera || 'N/A'}</td>
-                  <td>${pedido.biker || 'N/A'}</td>
-                  <td>✅ Entregado</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <!-- Totales -->
-          <div class="total-section">
-            <div class="total-item">
-              <div class="total-label">Total Cobros</div>
-              <div class="total-value">Bs${datosFiltrados.subtotalCobros.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Total Pagos</div>
-              <div class="total-value">Bs${datosFiltrados.subtotalPagos.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Total Carreras</div>
-              <div class="total-value">Bs${datosFiltrados.subtotalCarreras.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Subtotal</div>
-              <div class="total-value">Bs${datosFiltrados.subtotalGeneral.toFixed(2)}</div>
-            </div>
-            ${datosFiltrados.porcentajeDescuento > 0 ? `
-            <div class="total-item">
-              <div class="total-label">Descuento ${datosFiltrados.porcentajeDescuento}%</div>
-              <div class="total-value">-Bs${datosFiltrados.montoDescuento.toFixed(2)}</div>
-            </div>
-            ` : ''}
-            <div class="total-item">
-              <div class="total-label">Saldo Final</div>
-              <div class="total-value">Bs${datosFiltrados.saldo.toFixed(2)}</div>
-            </div>
-          </div>
-          
-          <!-- Pie de página -->
-          <div class="footer">
-            <p>Documento generado automáticamente por el sistema BEEZY</p>
-            <p>Para consultas contactar al administrador del sistema</p>
-          </div>
-          
-          <!-- Decoración de pie -->
-          <div class="wave-footer"></div>
-        </body>
-        </html>
-      `
-      }
-      
-      // Generar PDF usando la plantilla disponible
-      if (useExternalTemplate) {
-        // Sistema híbrido: Plantilla PDF + HTML renderizado
-        try {
-          const { jsPDF } = await import('jspdf')
-          const html2canvas = (await import('html2canvas')).default
-          
-          // Crear un contenedor temporal para el HTML
-          const tempContainer = document.createElement('div')
-          tempContainer.style.position = 'absolute'
-          tempContainer.style.left = '-9999px'
-          tempContainer.style.top = '0'
-          tempContainer.style.width = '210mm' // A4 width
-          tempContainer.style.backgroundColor = 'white'
-          tempContainer.style.padding = '20px'
-          tempContainer.style.fontFamily = 'Arial, sans-serif'
-          tempContainer.style.fontSize = '12px'
-          tempContainer.style.lineHeight = '1.4'
-          
-          // Crear el contenido HTML optimizado para PDF
-          tempContainer.innerHTML = `
-            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #28a745; padding-bottom: 15px;">
-              <div style="font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 10px;">
-                🚚 BEEZY
-              </div>
-              <div style="font-size: 18px; font-weight: bold; color: #333;">
-                RESUMEN DE COBROS Y PAGOS
-                ${fechaInicio || fechaFin ? '<br/><small style="font-size: 14px; color: #6c757d;">📅 Filtrado por Período de Fechas</small>' : ''}
-              </div>
-            </div>
-            
-            <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #28a745;">
-              <div style="font-size: 16px; font-weight: bold; color: #155724; margin-bottom: 5px;">
-                Cliente: ${datosFiltrados.cliente}
-              </div>
-              <div style="color: #6c757d; font-size: 13px;">
-                Fecha de generación: ${new Date().toLocaleDateString('es-BO', { 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </div>
-              ${fechaInicio || fechaFin ? `
-              <div style="color: #6c757d; font-size: 13px; margin-top: 5px;">
-                📅 Período: ${fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-BO') : 'Desde el inicio'} 
-                ${fechaFin ? `hasta ${new Date(fechaFin).toLocaleDateString('es-BO')}` : ''}
-              </div>
-              ` : ''}
-            </div>
-            
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #dee2e6;">
-              <div style="font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 15px; text-align: center;">
-                💰 RESUMEN FINANCIERO
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                <div style="text-align: center; padding: 15px; border-radius: 6px; background: #d4edda; border: 2px solid #c3e6cb; color: #155724;">
-                  <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Total Cobros</div>
-                  <div style="font-size: 18px; font-weight: bold;">Bs${datosFiltrados.totalCobros.toFixed(2)}</div>
-                </div>
-                <div style="text-align: center; padding: 15px; border-radius: 6px; background: #f8d7da; border: 2px solid #f5c6cb; color: #721c24;">
-                  <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Total Pagos</div>
-                  <div style="font-size: 18px; font-weight: bold;">Bs${datosFiltrados.totalPagos.toFixed(2)}</div>
-                </div>
-                <div style="text-align: center; padding: 15px; border-radius: 6px; background: #fff3cd; border: 2px solid #ffeaa7; color: #856404;">
-                  <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Total Carreras</div>
-                  <div style="font-size: 18px; font-weight: bold;">Bs${datosFiltrados.totalCarreras.toFixed(2)}</div>
-                </div>
-                <div style="text-align: center; padding: 15px; border-radius: 6px; background: ${datosFiltrados.saldo >= 0 ? '#d4edda' : '#f8d7da'}; border: 2px solid ${datosFiltrados.saldo >= 0 ? '#c3e6cb' : '#f5c6cb'}; color: ${datosFiltrados.saldo >= 0 ? '#155724' : '#721c24'};">
-                  <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase;">Saldo Final</div>
-                  <div style="font-size: 18px; font-weight: bold;">Bs${datosFiltrados.saldo.toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div style="margin-top: 25px;">
-              <div style="font-size: 16px; font-weight: bold; color: #2c3e50; margin-bottom: 15px; text-align: center;">
-                📋 DETALLE DE TRANSACCIONES
-              </div>
-              <table style="width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid #dee2e6;">
-                <thead>
-                  <tr style="background-color: #28a745; color: white;">
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">Nº</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">FECHA</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">TIPO</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">MONTO</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">PRECIO CARRERA</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">DESCRIPCIÓN</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">BIKER</th>
-                    <th style="padding: 8px 6px; text-align: left; font-weight: bold; border: 1px solid #1e7e34; font-size: 10px;">ESTADO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${datosFiltrados.pedidos.map((pedido, index) => `
-                    <tr style="background-color: ${pedido.cobro_pago === 'Cobro' ? '#d4edda' : '#f8d7da'};">
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;">${index + 1}</td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;">${pedido.fecha || 'N/A'}</td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;"><strong>${pedido.cobro_pago}</strong></td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;"><strong>Bs${pedido.monto_cobro_pago || '0.00'}</strong></td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;"><strong>Bs${pedido.precio_bs || '0.00'}</strong></td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;">${pedido.detalles_carrera || 'N/A'}</td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;">${pedido.biker || 'N/A'}</td>
-                      <td style="padding: 6px; border: 1px solid #dee2e6; font-size: 10px;">✅ Entregado</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-            
-            <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: end;">
-              <div style="text-align: center; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa; min-width: 80px;">
-                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px; text-transform: uppercase;">Total Cobros</div>
-                <div style="font-size: 12px; font-weight: bold; color: #28a745;">Bs${datosFiltrados.totalCobros.toFixed(2)}</div>
-              </div>
-              <div style="text-align: center; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa; min-width: 80px;">
-                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px; text-transform: uppercase;">Total Pagos</div>
-                <div style="font-size: 12px; font-weight: bold; color: #28a745;">Bs${datosFiltrados.totalPagos.toFixed(2)}</div>
-              </div>
-              <div style="text-align: center; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa; min-width: 80px;">
-                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px; text-transform: uppercase;">Total Carreras</div>
-                <div style="font-size: 12px; font-weight: bold; color: #28a745;">Bs${datosFiltrados.totalCarreras.toFixed(2)}</div>
-              </div>
-              <div style="text-align: center; padding: 8px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa; min-width: 80px;">
-                <div style="font-size: 10px; font-weight: bold; margin-bottom: 3px; text-transform: uppercase;">Saldo Final</div>
-                <div style="font-size: 12px; font-weight: bold; color: #28a745;">Bs${datosFiltrados.saldo.toFixed(2)}</div>
-              </div>
-            </div>
-            
-            <div style="margin-top: 30px; text-align: center; font-size: 10px; color: #6c757d; border-top: 1px solid #dee2e6; padding-top: 15px;">
-              <p>Documento generado automáticamente por el sistema BEEZY</p>
-              <p>Para consultas contactar al administrador del sistema</p>
-            </div>
-            
-            <div style="margin-top: 15px; height: 20px; background: linear-gradient(45deg, #28a745, #20c997); border-radius: 10px 10px 0 0; opacity: 0.3;"></div>
-          `
-          
-          // Agregar al DOM temporalmente
-          document.body.appendChild(tempContainer)
-          
-          // Convertir HTML a canvas
-          const canvas = await html2canvas(tempContainer, {
-            scale: 2, // Mayor resolución
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            width: tempContainer.offsetWidth,
-            height: tempContainer.offsetHeight
-          })
-          
-          // Crear PDF con la imagen
-          const imgData = canvas.toDataURL('image/png')
-          const pdf = new jsPDF('p', 'mm', 'a4')
-          
-          // Calcular dimensiones para ajustar la imagen al PDF
-          const pdfWidth = pdf.internal.pageSize.getWidth()
-          const pdfHeight = pdf.internal.pageSize.getHeight()
-          const imgWidth = canvas.width
-          const imgHeight = canvas.height
-          const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
-          const imgX = (pdfWidth - imgWidth * ratio) / 2
-          const imgY = 0
-          
-          // Agregar la imagen al PDF
-          pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
-          
-          // Limpiar el contenedor temporal
-          document.body.removeChild(tempContainer)
-          
-          // Descargar PDF
-          pdf.save(`Resumen_${datosFiltrados.cliente}_${new Date().toISOString().split('T')[0]}.pdf`)
-          
-          showNotification('📄 PDF híbrido generado exitosamente', 'success')
-          
-        } catch (pdfError) {
-
-          // Fallback a plantilla HTML si falla
-          useExternalTemplate = false
-          showNotification('⚠️ Usando plantilla HTML como respaldo', 'warning')
-        }
-      }
-      
-      if (!useExternalTemplate) {
-        // Crear ventana nueva para imprimir con plantilla HTML
-        const printWindow = window.open('', '_blank')
-        printWindow.document.write(htmlContent)
-        printWindow.document.close()
-        
-        // Esperar a que se cargue el contenido y luego imprimir
-        printWindow.onload = () => {
-          printWindow.print()
-          printWindow.close()
-        }
-      }
-      
-      showNotification(`📄 PDF generado para ${datosFiltrados.cliente}`, 'success')
-    } catch (error) {
-
-      showNotification('❌ Error al generar PDF', 'error')
-    }
+  const generarPDFConHTMLWrapper = async (datosFiltrados, fechaInicio, fechaFin) => {
+    await generarPDFConHTML(datosFiltrados, fechaInicio, fechaFin, showNotification)
   }
 
-  // Función para generar PDF usando HTML como fallback
-  const generarPDFConHTML = async (datosFiltrados, fechaInicio, fechaFin) => {
-    try {
-
-      // Crear ventana nueva para imprimir con plantilla HTML
-      const printWindow = window.open('', '_blank')
-      
-      // Crear contenido HTML para el PDF
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Resumen de Cobros y Pagos - ${datosFiltrados.cliente}${fechaInicio || fechaFin ? ' (Filtrado por Fecha)' : ''}</title>
-          <style>
-            @page { 
-              size: A4; 
-              margin: 1.5cm; 
-            }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              margin: 0; 
-              padding: 0;
-              background: white;
-              color: #333;
-              line-height: 1.3;
-            }
-            .header {
-              display: flex;
-              align-items: center;
-              margin-bottom: 20px;
-              padding-bottom: 15px;
-              border-bottom: 2px solid #28a745;
-            }
-            .logo {
-              font-size: 24px;
-              font-weight: bold;
-              color: #28a745;
-              margin-right: 15px;
-            }
-            .title {
-              font-size: 18px;
-              font-weight: bold;
-              color: #333;
-            }
-            .client-info {
-              background: #e8f5e8;
-              padding: 15px;
-              border-radius: 8px;
-              margin-bottom: 25px;
-              border-left: 4px solid #28a745;
-            }
-            .client-name {
-              font-size: 16px;
-              font-weight: bold;
-              color: #155724;
-              margin-bottom: 5px;
-            }
-            .generation-date {
-              color: #6c757d;
-              font-size: 13px;
-            }
-            .summary-section {
-              margin-bottom: 25px;
-            }
-            .summary-title {
-              font-size: 16px;
-              font-weight: bold;
-              color: #2c3e50;
-              text-align: center;
-              margin-bottom: 15px;
-              padding: 10px;
-              background: #f8f9fa;
-              border-radius: 4px;
-              border: 1px solid #dee2e6;
-            }
-            .summary-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 15px;
-              margin-bottom: 25px;
-            }
-            .summary-item {
-              padding: 15px;
-              border-radius: 6px;
-              text-align: center;
-              border: 2px solid;
-            }
-            .cobros-item {
-              background: #d4edda;
-              border-color: #c3e6cb;
-              color: #155724;
-            }
-            .pagos-item {
-              background: #f8d7da;
-              border-color: #f5c6cb;
-              color: #721c24;
-            }
-            .summary-label {
-              font-size: 12px;
-              font-weight: bold;
-              margin-bottom: 5px;
-              text-transform: uppercase;
-            }
-            .summary-value {
-              font-size: 18px;
-              font-weight: bold;
-            }
-            .transactions-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 25px;
-              font-size: 11px;
-            }
-            .transactions-table th,
-            .transactions-table td {
-              border: 1px solid #dee2e6;
-              padding: 8px;
-              text-align: left;
-            }
-            .transactions-table th {
-              background-color: #28a745;
-              color: white;
-              font-weight: bold;
-              font-size: 10px;
-            }
-            .cobro-row {
-              background-color: #d4edda;
-            }
-            .pago-row {
-              background-color: #f8d7da;
-            }
-            .total-section {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 25px;
-            }
-            .total-item {
-              text-align: center;
-              padding: 10px;
-              border: 1px solid #dee2e6;
-              border-radius: 4px;
-              background: #f8f9fa;
-              min-width: 100px;
-            }
-            .total-label {
-              font-size: 10px;
-              font-weight: bold;
-              margin-bottom: 3px;
-              text-transform: uppercase;
-              color: #6c757d;
-            }
-            .total-value {
-              font-size: 14px;
-              font-weight: bold;
-              color: #28a745;
-            }
-            .footer {
-              text-align: center;
-              font-size: 10px;
-              color: #6c757d;
-              border-top: 1px solid #dee2e6;
-              padding-top: 15px;
-              margin-top: 30px;
-            }
-            .wave-footer {
-              height: 20px;
-              background: linear-gradient(45deg, #28a745, #20c997);
-              border-radius: 10px 10px 0 0;
-              opacity: 0.3;
-              margin-top: 15px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="logo">🚚</div>
-            <div class="title">RESUMEN DE COBROS Y PAGOS</div>
-          </div>
-          
-          <div class="client-info">
-            <div class="client-name">Cliente: ${datosFiltrados.cliente}</div>
-            <div class="generation-date">
-              Fecha de generación: ${new Date().toLocaleDateString('es-BO', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
-            ${fechaInicio || fechaFin ? `
-            <div style="color: #6c757d; font-size: 13px; margin-top: 5px;">
-              📅 Período: ${fechaInicio ? new Date(fechaInicio).toLocaleDateString('es-BO') : 'Desde el inicio'} 
-              ${fechaFin ? `hasta ${new Date(fechaFin).toLocaleDateString('es-BO')}` : ''}
-            </div>
-            ` : ''}
-          </div>
-          
-          <div class="summary-section">
-            <div class="summary-title">RESUMEN FINANCIERO</div>
-            <div class="summary-grid">
-              <div class="summary-item cobros-item">
-                <div class="summary-label">Cobros</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalCobros.toFixed(2)}</div>
-              </div>
-              <div class="summary-item" style="background: #fff3cd; border-color: #ffeaa7; color: #856404;">
-                <div class="summary-label">Carreras</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalCarreras.toFixed(2)}</div>
-              </div>
-              <div class="summary-item pagos-item">
-                <div class="summary-label">Pagos</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalPagos.toFixed(2)}</div>
-              </div>
-              <div class="summary-item" style="background: #e2e3e5; border-color: #d6d8db; color: #383d41;">
-                <div class="summary-label">Subtotal</div>
-                <div class="summary-value">Bs${datosFiltrados.subtotalGeneral.toFixed(2)}</div>
-              </div>
-              ${datosFiltrados.porcentajeDescuento > 0 ? `
-              <div class="summary-item" style="background: #f8d7da; border-color: #f5c6cb; color: #721c24;">
-                <div class="summary-label">Descuento ${datosFiltrados.porcentajeDescuento}%</div>
-                <div class="summary-value">-Bs${datosFiltrados.montoDescuento.toFixed(2)}</div>
-              </div>
-              ` : ''}
-              <div class="summary-item" style="background: ${datosFiltrados.saldo >= 0 ? '#d4edda' : '#f8d7da'}; border-color: ${datosFiltrados.saldo >= 0 ? '#c3e6cb' : '#f5c6cb'}; color: ${datosFiltrados.saldo >= 0 ? '#155724' : '#721c24'};">
-                <div class="summary-label">${datosFiltrados.saldo >= 0 ? 'Nos debe' : 'Le debemos'}</div>
-                <div class="summary-value">Bs${Math.abs(datosFiltrados.saldo).toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-          
-          <table class="transactions-table">
-            <thead>
-              <tr>
-                <th>Nº</th>
-                <th>FECHA</th>
-                <th>TIPO</th>
-                <th>MONTO</th>
-                <th>PRECIO CARRERA</th>
-                <th>DESCRIPCIÓN</th>
-                <th>BIKER</th>
-                <th>ESTADO</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${datosFiltrados.pedidos.map((pedido, index) => `
-                <tr class="${pedido.cobro_pago === 'Cobro' ? 'cobro-row' : 'pago-row'}">
-                  <td>${index + 1}</td>
-                  <td>${pedido.fecha || 'N/A'}</td>
-                  <td><strong>${pedido.cobro_pago}</strong></td>
-                  <td><strong>Bs${pedido.monto_cobro_pago || '0.00'}</strong></td>
-                  <td><strong>Bs${pedido.precio_bs || '0.00'}</strong></td>
-                  <td>${pedido.detalles_carrera || 'N/A'}</td>
-                  <td>${pedido.biker || 'N/A'}</td>
-                  <td>✅ Entregado</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="total-section">
-            <div class="total-item">
-              <div class="total-label">Total Cobros</div>
-              <div class="total-value">Bs${datosFiltrados.totalCobros.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Total Pagos</div>
-              <div class="total-value">Bs${datosFiltrados.totalPagos.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Total Carreras</div>
-              <div class="total-value">Bs${datosFiltrados.totalCarreras.toFixed(2)}</div>
-            </div>
-            <div class="total-item">
-              <div class="total-label">Saldo Final</div>
-              <div class="total-value">Bs${datosFiltrados.saldo.toFixed(2)}</div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="footer">
-            <p>Documento generado automáticamente por el sistema BEEZY</p>
-            <p>Para consultas contactar al administrador del sistema</p>
-          </div>
-          
-          <div class="wave-footer"></div>
-        </body>
-        </html>
-      `
-      
-      printWindow.document.write(htmlContent)
-      printWindow.document.close()
-      
-      // Esperar a que se cargue el contenido y luego imprimir
-      printWindow.onload = () => {
-        printWindow.print()
-        printWindow.close()
-      }
-      
-      showNotification('📄 PDF HTML generado exitosamente', 'success')
-      
-    } catch (error) {
-
-      showNotification('❌ Error al generar PDF HTML', 'error')
-    }
+  const generatePDFResumenWrapper = async (clienteData, fechaInicio = null, fechaFin = null) => {
+    await generatePDFResumen(clienteData, fechaInicio, fechaFin, descuentosClientes, showNotification, generarPDFConPlantillaWrapper, generarPDFConHTMLWrapper)
   }
+
+  // Funciones de PDF movidas a src/services/pdfService.js
+  // Las funciones originales fueron: generarPDFConPlantilla, generatePDFResumen, generarPDFConHTML
+  // Ahora se usan los wrappers de arriba que delegan al servicio
+  // Las 3 funciones grandes de PDF (generarPDFConPlantilla, generatePDFResumen, generarPDFConHTML)
+  // fueron movidas a src/services/pdfService.js (~1,150 líneas eliminadas)
 
   // Funciones para Cuentas Biker
   const loadBikersForCuentas = async () => {
@@ -2663,24 +1204,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           if (!fechaPedido) return false
             
             try {
-            // Convertir fecha del pedido a formato normalizado (YYYY-MM-DD)
-            let fechaPedidoNormalizada
-            if (fechaPedido.includes('/')) {
-              // Formato DD/MM/YYYY
-              const [dia, mes, ano] = fechaPedido.split('/')
-              fechaPedidoNormalizada = `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
-            } else if (fechaPedido.includes('-')) {
-              // Ya está en formato YYYY-MM-DD o similar
-              fechaPedidoNormalizada = fechaPedido.split('T')[0] // Quitar hora si la tiene
-            } else {
-              // Intentar parsear como fecha
-              const fecha = new Date(fechaPedido)
-              if (!isNaN(fecha.getTime())) {
-                fechaPedidoNormalizada = fecha.toISOString().split('T')[0]
-              } else {
-                return false
-              }
-            }
+            // Convertir fecha del pedido a formato ISO usando dateService
+            const fechaPedidoNormalizada = convertToISO(fechaPedido)
+            if (!fechaPedidoNormalizada) return false
             
             // Comparar según tipo de filtro
             if (esRango) {
@@ -2857,22 +1383,11 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       const fechaPedido = pedido.fecha || pedido['Fecha Registro'] || pedido['Fechas'] || ''
       if (!fechaPedido || fechaPedido === 'N/A') return false
       
-      // Convertir fecha del pedido a formato comparable
-      let fechaPedidoDate = null
-      try {
-        // Intentar parsear diferentes formatos
-        if (fechaPedido.includes('/')) {
-          const [day, month, year] = fechaPedido.split('/')
-          fechaPedidoDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-        } else if (fechaPedido.includes('-')) {
-          fechaPedidoDate = new Date(fechaPedido)
-        } else {
-          fechaPedidoDate = new Date(fechaPedido)
-        }
-      } catch (e) {
-        return false
-      }
+      // Convertir fecha del pedido a Date usando dateService
+      const fechaPedidoISO = convertToISO(fechaPedido)
+      if (!fechaPedidoISO) return false
       
+      const fechaPedidoDate = new Date(fechaPedidoISO + 'T00:00:00')
       if (isNaN(fechaPedidoDate.getTime())) return false
       
       // Comparar con rango de fechas
@@ -2972,83 +1487,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         return
       }
 
-      // Función para formatear fechas a DD/MM/YYYY
-      const formatearFecha = (fecha) => {
-        if (!fecha && fecha !== 0) return ''
-        
-        // Convertir a string si no lo es
-        let fechaStr = String(fecha).trim()
-        
-        // Si está vacío después de trim, retornar vacío
-        if (!fechaStr) return ''
-        
-        // Si ya está en formato DD/MM/YYYY, retornarlo
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(fechaStr)) {
-          return fechaStr
-        }
-        
-        // Si está en formato YYYY-MM-DD (con o sin hora), convertir a DD/MM/YYYY
-        const matchYYYYMMDD = fechaStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-        if (matchYYYYMMDD) {
-          const [, year, month, day] = matchYYYYMMDD
-          return `${day}/${month}/${year}`
-        }
-        
-        // Si es un número (serial date de Excel), convertir a fecha
-        if (!isNaN(fecha) && !isNaN(parseFloat(fecha)) && isFinite(fecha)) {
-          // Excel serial date: 1 = 1900-01-01
-          // JavaScript Date: 0 = 1970-01-01
-          // Diferencia: 25569 días (70 años * 365.25 días + días bisiestos)
-          const excelEpoch = new Date(1899, 11, 30) // 30 de diciembre de 1899
-          const jsDate = new Date(excelEpoch.getTime() + (parseFloat(fecha) - 1) * 86400000)
-          
-          if (!isNaN(jsDate.getTime())) {
-            const day = String(jsDate.getDate()).padStart(2, '0')
-            const month = String(jsDate.getMonth() + 1).padStart(2, '0')
-            const year = jsDate.getFullYear()
-            return `${day}/${month}/${year}`
-          }
-        }
-        
-        // Intentar parsear como Date (último recurso)
-        // Usar formato ISO o estándar
-        try {
-          // Si tiene formato con espacios o caracteres especiales, limpiarlo
-          fechaStr = fechaStr.replace(/[^\d\/\-]/g, ' ').trim()
-          
-          // Intentar diferentes formatos
-          let date = null
-          
-          // Formato YYYY-MM-DD
-          if (/^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-            date = new Date(fechaStr)
-          }
-          // Formato DD/MM/YYYY
-          else if (/^\d{2}\/\d{2}\/\d{4}/.test(fechaStr)) {
-            const parts = fechaStr.split('/')
-            if (parts.length === 3) {
-              // Asumir DD/MM/YYYY
-              date = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10))
-            }
-          }
-          // Formato genérico
-          else {
-            date = new Date(fechaStr)
-          }
-          
-          if (date && !isNaN(date.getTime())) {
-            const day = String(date.getDate()).padStart(2, '0')
-            const month = String(date.getMonth() + 1).padStart(2, '0')
-            const year = date.getFullYear()
-            return `${day}/${month}/${year}`
-          }
-        } catch (e) {
-
-        }
-        
-        // Si no se pudo formatear, retornar el valor original
-        return fechaStr
-      }
+      // NOTA: formatearFecha eliminada - se usa formatDateForDisplay de dateService.js
       
       // Extraer información de totales (las filas de totales tienen el texto en la columna "Entrega")
 
@@ -3312,9 +1751,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         }
         
         currentX = margin
-        // Formatear fecha antes de agregar a rowData
+        // Formatear fecha antes de agregar a rowData usando dateService
         const fechaOriginal = row['Fecha'] || ''
-        const fechaFormateada = formatearFecha(fechaOriginal)
+        const fechaFormateada = formatDateForDisplay(fechaOriginal)
         
         // Debug: mostrar conversión de fechas
         if (fechaOriginal && fechaOriginal !== fechaFormateada) {
@@ -4192,11 +2631,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       let lastSavedDate = null
       
       for (let i = 0; i < selectedDates.length; i++) {
-        const fecha = selectedDates[i]
+        const fechaOriginal = selectedDates[i]
         const newId = String(baseId + i)
         
-        // Calcular día de la semana para la nueva fecha
-        const diaSemana = calculateDayOfWeek(fecha)
+        // Normalizar la fecha al formato estándar DD/MM/YYYY
+        const fecha = formatToStandardDate(fechaOriginal)
+        console.log(`📅 [Duplicar Pedido] Fecha normalizada: "${fechaOriginal}" -> "${fecha}"`)
+        
+        // Calcular día de la semana para la nueva fecha (usar fecha original ISO para cálculo)
+        const diaSemana = calculateDayOfWeek(fechaOriginal)
         
         // Obtener fecha y hora de registro actual
         const { fechaRegistro, horaRegistro } = getBoliviaDateTime()
@@ -4205,7 +2648,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         const duplicatedOrder = {
           ...originalOrder,
           id: newId,
-          fecha: fecha,
+          fecha: fecha, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
           dia_semana: diaSemana,
           fecha_registro: fechaRegistro,
           hora_registro: horaRegistro,
@@ -4235,13 +2678,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       
         // Cambiar el filtro de fecha a la última fecha duplicada para ver los pedidos en el kanban
         if (lastSavedDate) {
-          // Convertir fecha de formato YYYY-MM-DD a formato ISO si es necesario
-          const fechaISO = lastSavedDate.includes('/') 
-            ? (() => {
-                const [day, month, year] = lastSavedDate.split('/')
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-              })()
-            : lastSavedDate
+          // Convertir fecha a formato ISO usando dateService
+          const fechaISO = convertToISO(lastSavedDate) || lastSavedDate
           
           setDateFilter(fechaISO)
           setViewType('day') // Asegurar que esté en vista de día
@@ -4303,12 +2741,17 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       showNotification('🔄 Guardando cambios...', 'info')
       
       try {
+        // Normalizar la fecha al formato estándar DD/MM/YYYY antes de editar
+        const fechaNormalizada = formatToStandardDate(form.fecha)
+        console.log(`📅 [Editar Pedido] Fecha normalizada: "${form.fecha}" -> "${fechaNormalizada}"`)
+        
         // Mantener TODOS los campos del pedido original y sobrescribir solo los editados
         // Primero copiar editingOrder, pero eliminar campos con nombres de columnas del sheet para evitar conflictos
         const { 'Info. Adicional Recojo': _, 'Info. Adicional Entrega': __, 'Tiempo de espera': ___, ...editingOrderClean } = editingOrder
         const updatedOrder = {
           ...editingOrderClean, // Copiar campos originales sin nombres de columnas del sheet
           ...form,         // Sobrescribir con los campos editados del formulario
+          fecha: fechaNormalizada, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
           id: editingOrder.id, // Asegurar que el ID no cambie
           fecha_registro: editingOrder.fecha_registro, // Mantener fecha de registro original
           hora_registro: editingOrder.hora_registro,    // Mantener hora de registro original
@@ -4344,6 +2787,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         setEntregaClienteAvisa(false)
         
         showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
+        
+        // Recargar pedidos desde el sheet para sincronizar
+        await loadOrdersFromSheet(true)
         
         // Cambiar a ver pedidos
         setActiveTab('ver')
@@ -4406,9 +2852,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
     }
     
+    // Normalizar la fecha al formato estándar DD/MM/YYYY antes de crear el pedido
+    const fechaNormalizada = formatToStandardDate(form.fecha)
+    console.log(`📅 [Crear Pedido] Fecha normalizada: "${form.fecha}" -> "${fechaNormalizada}"`)
+    
     const newOrder = { 
       id: nextId.toString(), 
       ...form,
+      fecha: fechaNormalizada, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
       operador: operadorDefault, // Asegurar que el operador se asigne correctamente
       fecha_registro: fechaRegistro,
       hora_registro: horaRegistro,
@@ -4475,6 +2926,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       setLastAddedOrder(newOrder)
       setShowSuccessModal(true)
       
+      // Recargar pedidos desde el sheet para sincronizar
+      await loadOrdersFromSheet(true)
+      
       // NO cambiar de pestaña automáticamente - dejar que el usuario decida
       
     } catch (err) {
@@ -4494,205 +2948,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   // Función para construir el mensaje de WhatsApp
-  const buildWhatsAppMessage = (order) => {
-    // Obtener solo el nombre del cliente (sin la descripción completa)
-    const clienteNombre = order.cliente || 'Sin especificar'
-    
-    const recojo = order.recojo || 'Sin especificar'
-    const direccionRecojo = order.direccion_recojo || 'Sin dirección'
-    const infoRecojo = order.info_direccion_recojo || ''
-    
-    // Formatear el recojo correctamente
-    let recojoCompleto = recojo
-    if (recojo === 'Cliente avisa') {
-      recojoCompleto = 'Cliente avisa'
-    } else if (direccionRecojo && direccionRecojo !== 'Sin dirección') {
-      if (direccionRecojo.includes('http')) {
-        recojoCompleto = `${recojo}: ${direccionRecojo}`
-      } else {
-        recojoCompleto = `${recojo}: ${direccionRecojo}`
-      }
-    }
-    // Agregar información adicional de recojo si existe
-    if (infoRecojo) {
-      recojoCompleto += `\n   ${infoRecojo}`
-    }
-    
-    const entrega = order.entrega || 'Sin especificar'
-    const direccionEntrega = order.direccion_entrega || ''
-    const infoEntrega = order.info_direccion_entrega || ''
-    
-    // Formatear la entrega
-    let entregaCompleta = entrega
-    if (entrega === 'Cliente avisa') {
-      entregaCompleta = 'Cliente avisa'
-    } else if (direccionEntrega && direccionEntrega.includes('http')) {
-      entregaCompleta = `${entrega}: ${direccionEntrega}`
-    }
-    // Agregar información adicional de entrega si existe
-    if (infoEntrega) {
-      entregaCompleta += `\n   ${infoEntrega}`
-    }
-    
-    const infoExtra = order.detalles_carrera || ''
-    const metodoPago = order.metodo_pago || 'Efectivo'
-    
-    // Construir el mensaje base con negritas para WhatsApp
-    let mensaje = `🐝 Beezy dice: 
-
-*CLIENTE:* ${clienteNombre}
-
-*Recoger:* ${recojoCompleto}
-
-*Entrega:* ${entregaCompleta}
-
-*Info Extra:* ${infoExtra}
-
-*Carrera:* `
-    
-    // Agregar precio y método de pago para Carrera
-    if (metodoPago === 'Cuenta' || metodoPago === 'cuenta' || metodoPago.toLowerCase() === 'cuenta' || 
-        metodoPago === 'A cuenta' || metodoPago === 'a cuenta' || metodoPago.toLowerCase() === 'a cuenta') {
-      // Para "Cuenta" o "A cuenta", solo mostrar el método sin precio
-      mensaje += `${metodoPago}`
-    } else if (order.precio_bs) {
-      // Para otros métodos, mostrar precio y método
-      const precio = parseFloat(order.precio_bs) || 0
-      mensaje += `Bs ${precio.toFixed(2)}    *${metodoPago}*`
-    } else {
-      // Si no hay precio, solo mostrar método
-      mensaje += `*${metodoPago}*`
-    }
-    
-    // Agregar cobro/pago si existe
-    if (order.cobro_pago && order.cobro_pago.trim() !== '' && order.monto_cobro_pago) {
-      const montoCobro = parseFloat(order.monto_cobro_pago) || 0
-      mensaje += `\n\n*${order.cobro_pago.toUpperCase()}:* Bs ${montoCobro.toFixed(2)}`
-      
-      // Agregar descripción de cobro o pago si existe
-      if (order.descripcion_cobro_pago && order.descripcion_cobro_pago.trim() !== '') {
-        mensaje += `\n📝 ${order.descripcion_cobro_pago}`
-      }
-    }
-    
-    return mensaje
-  }
-
-  // Función para generar URL de WhatsApp
-  const generateWhatsAppURL = (order, customMessage = null) => {
-    // Obtener el número de WhatsApp del biker asignado
-    let phoneNumber = '59169499202' // Número por defecto si no hay biker
-    
-    if (order.biker) {
-      const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === order.biker)
-      if (selectedBiker && selectedBiker.whatsapp && selectedBiker.whatsapp !== 'N/A') {
-        // Limpiar el número de WhatsApp (remover espacios, guiones, etc.)
-        phoneNumber = selectedBiker.whatsapp.replace(/[\s\-\(\)]/g, '')
-
-      } else if (order.whatsapp && order.whatsapp.trim()) {
-        // Usar el WhatsApp del formulario como fallback
-        phoneNumber = order.whatsapp.replace(/[\s\-\(\)]/g, '')
-
-      } else {
-
-      }
-    } else {
-
-    }
-    
-    // Usar el mensaje personalizado si existe, sino construir uno nuevo
-    const mensaje = customMessage || buildWhatsAppMessage(order)
-
-    // Codificar el mensaje para URL
-    const mensajeCodificado = encodeURIComponent(mensaje)
-    
-    // Generar la URL completa
-    const whatsappURL = `https://api.whatsapp.com/send/?phone=${phoneNumber}&text=${mensajeCodificado}`
-    
-    return whatsappURL
-  }
+  // buildWhatsAppMessage y generateWhatsAppURL ahora se importan desde whatsAppUtils.js
 
   // normalize, headerMap, convertExcelDate, y mapRowToOrder ahora se importan desde ordersService.js
-
-  // Función para formatear fechas para mostrar en DD/MM/YYYY
-  const formatDateForDisplay = (dateString) => {
-    if (!dateString || dateString === 'N/A') return 'N/A'
-    
-    try {
-      // Convertir a string si no lo es
-      let fechaStr = String(dateString).trim()
-      
-      // Si está vacío, retornar N/A
-      if (!fechaStr) return 'N/A'
-      
-      // Si ya está en formato DD/MM/YYYY, devolverla tal como está
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(fechaStr)) {
-        return fechaStr
-      }
-      
-      // Si viene en formato YYYY-MM-DD (con o sin hora), convertir a DD/MM/YYYY
-      const matchYYYYMMDD = fechaStr.match(/^(\d{4})-(\d{2})-(\d{2})/)
-      if (matchYYYYMMDD) {
-        const [, year, month, day] = matchYYYYMMDD
-        return `${day}/${month}/${year}`
-      }
-      
-      // Si es un número (serial date de Excel), convertir a fecha
-      if (!isNaN(fechaStr) && !isNaN(parseFloat(fechaStr)) && isFinite(fechaStr)) {
-        // Excel serial date: 1 = 1900-01-01
-        const excelEpoch = new Date(1899, 11, 30) // 30 de diciembre de 1899
-        const jsDate = new Date(excelEpoch.getTime() + (parseFloat(fechaStr) - 1) * 86400000)
-        
-        if (!isNaN(jsDate.getTime())) {
-          const day = String(jsDate.getDate()).padStart(2, '0')
-          const month = String(jsDate.getMonth() + 1).padStart(2, '0')
-          const year = jsDate.getFullYear()
-        return `${day}/${month}/${year}`
-      }
-      }
-      
-      // Intentar parsear como Date (último recurso)
-      try {
-        // Limpiar caracteres especiales
-        fechaStr = fechaStr.replace(/[^\d\/\-]/g, ' ').trim()
-        
-        // Intentar diferentes formatos
-        let date = null
-        
-        // Formato YYYY-MM-DD
-        if (/^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-          date = new Date(fechaStr)
-        }
-        // Formato DD/MM/YYYY
-        else if (/^\d{2}\/\d{2}\/\d{4}/.test(fechaStr)) {
-          const parts = fechaStr.split('/')
-          if (parts.length === 3) {
-            // Asumir DD/MM/YYYY
-            date = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10))
-          }
-        }
-        // Formato genérico
-        else {
-          date = new Date(fechaStr)
-        }
-        
-        if (date && !isNaN(date.getTime())) {
-          const day = String(date.getDate()).padStart(2, '0')
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-        const year = date.getFullYear()
-        return `${day}/${month}/${year}`
-        }
-      } catch (e) {
-
-      }
-      
-      // Si no se pudo formatear, retornar el valor original
-      return fechaStr
-    } catch (error) {
-
-      return dateString // Si hay error, devolver el valor original
-    }
-  }
+  // formatDateForDisplay ahora se importa desde dateService.js (centralizado)
 
   // ===== FUNCIONES PARA NOTIFICACIONES DE CARRERAS AGENDADAS =====
   /**
@@ -4727,19 +2986,11 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     if (!order.fecha) return false
     
     const todayISO = getBoliviaDateISO() // Formato YYYY-MM-DD
-    let orderDateISO = null
     
     try {
-      // Convertir fecha del pedido (DD/MM/YYYY) a formato ISO (YYYY-MM-DD)
-      if (order.fecha.includes('/')) {
-        const [day, month, year] = order.fecha.split('/')
-        orderDateISO = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-      } else if (order.fecha.includes('-')) {
-        // Si ya está en formato ISO, usarlo directamente
-        orderDateISO = order.fecha.split('T')[0] // Por si viene con hora
-      } else {
-        return false
-      }
+      // Convertir fecha del pedido a formato ISO usando dateService
+      const orderDateISO = convertToISO(order.fecha)
+      if (!orderDateISO) return false
       
       // Solo notificar si el pedido es del día actual
       if (orderDateISO !== todayISO) {
@@ -4872,27 +3123,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       filtered = filtered.filter((o) => {
         if (o.fecha) {
           try {
-            // Convertir fecha DD/MM/YYYY a Date para comparar
-            let orderDate
-            if (o.fecha.includes('/')) {
-              const [day, month, year] = o.fecha.split('/')
-              const fecha = new Date(year, month - 1, day)
-              if (!isNaN(fecha.getTime())) {
-                orderDate = fecha.toISOString().split('T')[0]
-              } else {
-                return false
-              }
-            } else if (o.fecha) {
-              // Si ya está en formato estándar
-              const fecha = new Date(o.fecha)
-              if (!isNaN(fecha.getTime())) {
-                orderDate = fecha.toISOString().split('T')[0]
-              } else {
-                return false
-              }
-            } else {
-              return false
-            }
+            // Convertir fecha a ISO para comparar usando dateService
+            const orderDate = convertToISO(o.fecha)
+            if (!orderDate) return false
             
           return orderDate === dateFilter
           } catch (error) {
@@ -4907,27 +3140,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       filtered = filtered.filter((o) => {
         if (o.fecha) {
           try {
-            // Convertir fecha DD/MM/YYYY a Date para comparar
-            let orderDate
-            if (o.fecha.includes('/')) {
-              const [day, month, year] = o.fecha.split('/')
-              const fecha = new Date(year, month - 1, day)
-              if (!isNaN(fecha.getTime())) {
-                orderDate = fecha.toISOString().split('T')[0]
-              } else {
-                return false
-              }
-            } else if (o.fecha) {
-              // Si ya está en formato estándar
-              const fecha = new Date(o.fecha)
-              if (!isNaN(fecha.getTime())) {
-                orderDate = fecha.toISOString().split('T')[0]
-              } else {
-                return false
-              }
-            } else {
-              return false
-            }
+            // Convertir fecha a ISO para comparar usando dateService
+            const orderDate = convertToISO(o.fecha)
+            if (!orderDate) return false
             
             return orderDate >= dateRange.start && orderDate <= dateRange.end
           } catch (error) {
@@ -4992,8 +3207,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     // Limpiar el formulario para un nuevo pedido
     setForm(initialOrder)
     // Resetear el mensaje de WhatsApp
-    setWhatsappMessage('')
-    setWhatsappMessageEdited(false)
+    resetWhatsappMessage()
     // Resetear estados
     setPrecioEditadoManualmente(false)
     setRecojoManual(false)
@@ -6470,8 +4684,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       <button
                         type="button"
                         onClick={() => {
+                          // Al cambiar whatsappMessageEdited a false, el useEffect regenerará el mensaje automáticamente
                           setWhatsappMessageEdited(false)
-                          setWhatsappMessage(buildWhatsAppMessage(form))
                         }}
                         style={{
                           fontSize: '12px',
@@ -6538,7 +4752,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         
                         const tempOrder = { ...form }
                         // Usar el mensaje editado si existe
-                        const whatsappURL = generateWhatsAppURL(tempOrder, whatsappMessage)
+                        const whatsappURL = generateWhatsAppURL(tempOrder, bikersAgregar, whatsappMessage)
                         window.open(whatsappURL, '_blank')
                         
                         // Mostrar notificación con información del destinatario
@@ -6989,12 +5203,12 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                                     return
                                   }
                                   
-                                  const whatsappURL = generateWhatsAppURL(order)
+                                  const whatsappURL = generateWhatsAppURL(order, bikersAgregar)
                                   window.open(whatsappURL, '_blank')
                                   
                                   // Mostrar notificación con información del destinatario
                                   if (order.biker) {
-                                    const selectedBiker = bikersData.find(biker => biker.name === order.biker)
+                                    const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === order.biker)
                                     if (selectedBiker && selectedBiker.whatsapp) {
                                       showNotification(`📱 Enviando WhatsApp a ${order.biker} (${selectedBiker.whatsapp})`, 'success')
                                     } else {
@@ -8811,74 +7025,16 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       {renderTabContent()}
       
       {/* Modal de Advertencia - Datos Faltantes */}
-      {missingDataModal.show && missingDataModal.order && (
-        <div className="modal-overlay" onClick={() => setMissingDataModal({ show: false, order: null })}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
-            <div className="modal-header">
-              <h3>⚠️ Datos Faltantes</h3>
-              <button 
-                className="modal-close" 
-                onClick={() => setMissingDataModal({ show: false, order: null })}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <p style={{ marginBottom: '20px', fontSize: '16px', lineHeight: '1.6' }}>
-                El pedido <strong>#{missingDataModal.order.id}</strong> no puede marcarse como entregado porque faltan datos críticos:
-              </p>
-              
-              <div style={{
-                backgroundColor: '#fff3cd',
-                border: '2px solid #ffc107',
-                borderRadius: '8px',
-                padding: '16px',
-                marginBottom: '20px'
-              }}>
-                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px' }}>
-                  {(!missingDataModal.order.biker || missingDataModal.order.biker.trim() === '' || missingDataModal.order.biker === 'ASIGNAR BIKER') && (
-                    <li style={{ marginBottom: '8px' }}>❌ <strong>Biker asignado</strong></li>
-                  )}
-                  {(!missingDataModal.order.entrega || missingDataModal.order.entrega.trim() === '') && (
-                    <li style={{ marginBottom: '8px' }}>❌ <strong>Lugar de entrega</strong></li>
-                  )}
-                  {(!missingDataModal.order.precio_bs || parseFloat(missingDataModal.order.precio_bs) <= 0) && (
-                    <li style={{ marginBottom: '8px' }}>❌ <strong>Precio (Bs)</strong></li>
-                  )}
-                  {(!missingDataModal.order.distancia_km || parseFloat(missingDataModal.order.distancia_km) <= 0) && (
-                    <li style={{ marginBottom: '8px' }}>❌ <strong>Distancia (Km)</strong></li>
-                  )}
-                </ul>
-              </div>
-              
-              <p style={{ marginBottom: '20px', fontSize: '15px', color: '#6c757d' }}>
-                Por favor, edita el pedido primero para completar estos campos antes de marcarlo como entregado.
-              </p>
-              
-              <div className="modal-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button 
-                  className="btn btn-secondary" 
-                  onClick={() => setMissingDataModal({ show: false, order: null })}
-                  style={{ padding: '10px 20px' }}
-                >
-                  Cerrar
-                </button>
-                <button 
-                  className="btn btn-primary" 
-                  onClick={() => {
+      <MissingDataModal
+        show={missingDataModal.show}
+        order={missingDataModal.order}
+        onClose={() => setMissingDataModal({ show: false, order: null })}
+        onEdit={() => {
                     setEditingOrder(missingDataModal.order)
                     setMissingDataModal({ show: false, order: null })
                     setActiveTab('agregar')
                   }}
-                  style={{ padding: '10px 20px' }}
-                >
-                  ✏️ Editar Pedido
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      />
       
       {/* Modal de Entrega */}
       {deliveryModal.show && (

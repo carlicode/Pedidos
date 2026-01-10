@@ -212,12 +212,16 @@ app.use(express.static(path.join(__dirname, '..')))
 // Importar rutas DESPUÉS de cargar .env
 import authRoutes from './routes/auth.js'
 import clientRoutes from './routes/client.js'
+import notesRoutes from './routes/notes.js'
 
 // Rutas de autenticación
 app.use('/api/auth', authRoutes)
 
 // Rutas protegidas de clientes
 app.use('/api/client', clientRoutes)
+
+// Rutas de notas del equipo
+app.use('/api/notes', notesRoutes)
 
 function getAuthClient() {
   let creds = null
@@ -374,13 +378,10 @@ function buildRow(order) {
       value = 'Debe Cliente'
     }
     
-    // Normalizar fechas a formato DD/MM/YYYY y forzar como texto
+    // Normalizar fechas a formato DD/MM/YYYY
     if (columnName === 'Fechas' && value) {
       value = normalizeDateToDDMMYYYY(value)
-      // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
-      if (value) {
-        value = `'${value}`
-      }
+      // Con valueInputOption: 'RAW', NO agregar comilla simple
       console.log(`  📅 Fecha normalizada: "${order[columnName]}" -> "${value}"`)
     }
     
@@ -1406,7 +1407,7 @@ app.post('/api/orders', async (req, res) => {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
         range: `${quoted}!A${existingRowIndex}:AD${existingRowIndex}`,
-        valueInputOption: 'USER_ENTERED',
+        valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
         requestBody: { values: [row] }
       })
       console.log(`Updated existing order #${order.id} at row ${existingRowIndex}`)
@@ -1414,8 +1415,8 @@ app.post('/api/orders', async (req, res) => {
       // Agregar nueva fila
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
-        range: `${quoted}!A:AD`,
-        valueInputOption: 'USER_ENTERED',
+        range: `${quoted}!A:AE`,
+        valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [row] }
       })
@@ -1656,8 +1657,8 @@ app.get('/api/read-orders', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth })
     const quoted = quoteSheet(SHEET_NAME)
     
-    // Leer todos los datos del sheet
-    const range = `${quoted}!A:AD`  // Leer todas las columnas hasta AD
+    // Leer todos los datos del sheet (hasta AE para incluir "Info. Adicional Entrega")
+    const range = `${quoted}!A:AE`  // Leer todas las columnas hasta AE
     console.log('📊 Leyendo rango:', range)
     
     const response = await sheets.spreadsheets.values.get({
@@ -3367,7 +3368,7 @@ app.post('/api/create-client-order', async (req, res) => {
     const appendResult = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: `${quotedClientes}!A:AD`,
-      valueInputOption: 'USER_ENTERED',
+      valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
         values: [newRow]
@@ -3669,8 +3670,8 @@ app.post('/api/cliente/crear-pedido', async (req, res) => {
       'WhatsApp': '',
       'Fechas': (() => {
         const fechaNormalizada = normalizeDateToDDMMYYYY(fechaDeseada)
-        // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
-        return fechaNormalizada ? `'${fechaNormalizada}` : ''
+        // Con valueInputOption: 'RAW', NO agregar comilla simple
+        return fechaNormalizada || ''
       })(),
       'Hora Ini': horaDeseada || '',
       'Hora Fin': '',
@@ -3704,7 +3705,7 @@ app.post('/api/cliente/crear-pedido', async (req, res) => {
     const appendResult = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
       range: `${quotedClientes}!A:AD`,
-      valueInputOption: 'USER_ENTERED',
+      valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
       insertDataOption: 'INSERT_ROWS',
       requestBody: {
         values: [newRow]

@@ -11,7 +11,9 @@ import Cliente from './pages/Cliente.jsx'
 import Inventario from './pages/Inventario.jsx'
 import InventarioAdmin from './pages/InventarioAdmin.jsx'
 import Unauthorized from './pages/Unauthorized.jsx'
+import Notes from './pages/Notes.jsx'
 import Icon from './components/Icon.jsx'
+import NotesFloatingButton from './components/NotesFloatingButton.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
 export default function App() {
@@ -39,7 +41,12 @@ export default function App() {
     <div className="app-container">
       {showHeader && (
         <header className="app-header">
-          <div className="brand">
+          <div 
+            className="brand" 
+            onClick={() => navigate('/pedidos')}
+            style={{ cursor: 'pointer' }}
+            title="Volver a Pedidos"
+          >
             <img src="/logo.jpg" alt="Beezy" className="brand-logo" />
             <span className="brand-text">Beezy</span>
           </div>
@@ -111,8 +118,19 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/notas"
+            element={
+              <ProtectedRoute>
+                <Notes />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        
+        {/* Burbuja flotante de notas - visible en todas las páginas cuando el usuario está autenticado, excepto en /notas */}
+        {isAuthenticated && showHeader && location.pathname !== '/notas' && <NotesFloatingButton />}
       </main>
 
       {showHeader && (

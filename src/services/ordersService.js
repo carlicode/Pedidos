@@ -4,6 +4,7 @@
  */
 
 import { getBackendUrl, getApiUrl } from '../utils/api.js'
+import { formatToStandardDate, prepareDateForSheet } from './dateService.js'
 
 /**
  * Normaliza un string eliminando acentos, caracteres especiales y convirtiendo a minúsculas
@@ -122,49 +123,8 @@ export const mapRowToOrder = (rowObj, index = 0, initialOrder = {}, operadorDefa
  * @returns {Object} Objeto filtrado con los campos para Google Sheets
  */
 export const filterOrderForSheet = (order) => {
-  // Función para convertir fecha del formulario a formato DD/MM/YYYY
-  // Normaliza cualquier formato de fecha a DD/MM/YYYY (igual que Fecha Registro)
-  const formatDateForSheet = (dateString) => {
-    if (!dateString || typeof dateString !== 'string') return ''
-    
-    const trimmed = dateString.trim()
-    if (!trimmed) return ''
-    
-    try {
-      // Si ya está en formato DD/MM/YYYY, devolverlo tal cual
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
-        return trimmed
-      }
-      
-      // Si viene en formato YYYY-MM-DD (del input type="date"), convertir a DD/MM/YYYY
-      if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-        const [year, month, day] = trimmed.split('-')
-        // Usar el mismo formato que Fecha Registro
-        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
-      }
-      
-      // Si es un número (Excel serial date), convertir usando la función de conversión
-      if (!isNaN(parseFloat(trimmed)) && isFinite(trimmed) && !trimmed.includes('/') && !trimmed.includes('-')) {
-        return convertExcelDate(trimmed)
-      }
-      
-      // Intentar crear un Date object y convertir manualmente a DD/MM/YYYY
-      const date = new Date(trimmed)
-      if (!isNaN(date.getTime())) {
-        // Construir manualmente para garantizar formato DD/MM/YYYY
-        const day = String(date.getDate()).padStart(2, '0')
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const year = date.getFullYear()
-        return `${day}/${month}/${year}`
-      }
-      
-      // Si no se pudo parsear, devolver string vacío
-      return ''
-    } catch (error) {
-      console.warn('Error formateando fecha para sheet:', dateString, error)
-      return ''
-    }
-  }
+  // NOTA: La función formatDateForSheet ahora se importa desde dateService.js
+  // Esto asegura consistencia en TODO el sistema (crear, editar, duplicar)
 
   const formatTimeForSheet = (timeString) => {
     if (!timeString) return ''
@@ -223,8 +183,8 @@ export const filterOrderForSheet = (order) => {
   
   return {
     'ID': order.id,
-    'Fecha Registro': `'${currentDate}`, // Forzar como texto con comilla simple
-    'Hora Registro': `'${currentTime}`,  // Forzar como texto con comilla simple
+    'Fecha Registro': currentDate, // Con RAW no necesitamos comilla simple
+    'Hora Registro': currentTime,  // Con RAW no necesitamos comilla simple
     'Operador': order.operador,
     'Cliente': order.cliente,
     'Recojo': recojoFinal,
@@ -239,12 +199,14 @@ export const filterOrderForSheet = (order) => {
     'Biker': order.biker,
     'WhatsApp': order.whatsapp,
     'Fechas': (() => {
-      const fechaConvertida = formatDateForSheet(order.fecha) || currentDate
-      // Forzar como texto con comilla simple para evitar que Google Sheets lo convierta a número serial
-      return fechaConvertida ? `'${fechaConvertida}` : ''
+      // Usar el servicio centralizado de fechas para GARANTIZAR consistencia
+      console.log(`📅 [Fechas] Valor original de order.fecha: "${order.fecha}"`)
+      const fechaConvertida = prepareDateForSheet(order.fecha, currentDate)
+      console.log(`📅 [Fechas] Valor final que se enviará: "${fechaConvertida}"`)
+      return fechaConvertida
     })(),
-    'Hora Ini': `'${formatTimeForSheet(order.hora_ini)}`,
-    'Hora Fin': `'${formatTimeForSheet(order.hora_fin)}`,
+    'Hora Ini': formatTimeForSheet(order.hora_ini), // Con RAW no necesitamos comilla simple
+    'Hora Fin': formatTimeForSheet(order.hora_fin), // Con RAW no necesitamos comilla simple
     'Duracion': order.duracion,
     'Estado': order.estado || 'Pendiente',
     'Estado de pago': order.estado_pago || 'Debe Cliente',
