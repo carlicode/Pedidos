@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import { getBackendUrl } from '../utils/api'
 import SearchableSelect from './SearchableSelect'
 import Papa from 'papaparse'
+import { calculatePrice } from '../utils/priceCalculator.js'
 
 const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }) => {
   const [isVisible, setIsVisible] = useState(false)
@@ -404,7 +405,7 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
     }
   }
 
-  // Función para calcular precio basado en distancia y medio de transporte (igual que Orders.jsx)
+  // Función para calcular precio usando el módulo centralizado de priceCalculator.js
   const calcularPrecio = (distanciaKm, medioTransporte) => {
     if (!distanciaKm || !medioTransporte) {
       setPrecio(null)
@@ -417,102 +418,10 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
       return
     }
 
-    let basePrice = 0
-
-    // Esquema de precios para Bicicleta (COSTOS TRANSPARENTES)
-    if (medioTransporte === 'Bicicleta') {
-      if (dist <= 1) {
-        basePrice = 8
-      } else if (dist <= 2) {
-        basePrice = 10
-      } else if (dist <= 3) {
-        basePrice = 12
-      } else if (dist <= 4) {
-        basePrice = 14
-      } else if (dist <= 5) {
-        basePrice = 16
-      } else if (dist <= 6) {
-        basePrice = 18
-      } else if (dist <= 7) {
-        basePrice = 20
-      } else if (dist <= 8) {
-        basePrice = 22
-      } else if (dist <= 9) {
-        basePrice = 24
-      } else if (dist <= 10) {
-        basePrice = 26
-      } else {
-        // Para distancias mayores a 10km: 26 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        basePrice = 26 + (kmAdicionales * 2)
-      }
-    }
-    // Esquema de precios para BeeZero (inicia en 10 Bs)
-    else if (medioTransporte === 'Beezero') {
-      if (dist <= 1) {
-        basePrice = 10
-      } else if (dist <= 2) {
-        basePrice = 12
-      } else if (dist <= 3) {
-        basePrice = 14
-      } else if (dist <= 4) {
-        basePrice = 16
-      } else if (dist <= 5) {
-        basePrice = 18
-      } else if (dist <= 6) {
-        basePrice = 20
-      } else if (dist <= 7) {
-        basePrice = 22
-      } else if (dist <= 8) {
-        basePrice = 24
-      } else if (dist <= 9) {
-        basePrice = 26
-      } else if (dist <= 10) {
-        basePrice = 28
-      } else {
-        // Para distancias mayores a 10km: 28 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        basePrice = 28 + (kmAdicionales * 2)
-      }
-    }
-    // Esquema de precios para Cargo: Bicicleta + 6 Bs
-    else if (medioTransporte === 'Cargo') {
-      // Calcular precio base de Bicicleta
-      let precioBicicleta = 0
-      if (dist <= 1) {
-        precioBicicleta = 8
-      } else if (dist <= 2) {
-        precioBicicleta = 10
-      } else if (dist <= 3) {
-        precioBicicleta = 12
-      } else if (dist <= 4) {
-        precioBicicleta = 14
-      } else if (dist <= 5) {
-        precioBicicleta = 16
-      } else if (dist <= 6) {
-        precioBicicleta = 18
-      } else if (dist <= 7) {
-        precioBicicleta = 20
-      } else if (dist <= 8) {
-        precioBicicleta = 22
-      } else if (dist <= 9) {
-        precioBicicleta = 24
-      } else if (dist <= 10) {
-        precioBicicleta = 26
-      } else {
-        // Para distancias mayores a 10km: 26 Bs + 2 Bs por km adicional
-        const kmAdicionales = Math.ceil(dist - 10)
-        precioBicicleta = 26 + (kmAdicionales * 2)
-      }
-      
-      // Cargo = Bicicleta + 6 Bs
-      basePrice = precioBicicleta + 6
-    }
-    // Para Scooter no se calcula precio automáticamente
-    else if (medioTransporte === 'Scooter') {
-      setPrecio(null)
-      return
-    } else {
+    const basePrice = calculatePrice(dist, medioTransporte)
+    
+    if (basePrice === 0) {
+      // Para Scooter u otros medios sin cálculo automático
       setPrecio(null)
       return
     }

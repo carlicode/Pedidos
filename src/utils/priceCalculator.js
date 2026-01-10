@@ -10,41 +10,23 @@
  */
 const calculateBicicletaPrice = (dist) => {
   if (dist <= 1) return 8
-  if (dist <= 2) return 10
-  if (dist <= 3) return 12
-  if (dist <= 4) return 14
-  if (dist <= 5) return 16
-  if (dist <= 6) return 18
-  if (dist <= 7) return 20
-  if (dist <= 8) return 22
-  if (dist <= 9) return 24
-  if (dist <= 10) return 26
   
-  // Para distancias mayores a 10km: 26 Bs + 2 Bs por km adicional
-  const kmAdicionales = Math.ceil(dist - 10)
-  return 26 + (kmAdicionales * 2)
+  // Después del primer km: precio base 8 Bs + 2.5 Bs por cada km adicional
+  const kmAdicionales = dist - 1
+  return 8 + (kmAdicionales * 2.5)
 }
 
 /**
- * Calcula el precio base para BeeZero según la distancia
+ * Calcula el precio base para BeeZero (Auto) según la distancia
  * @param {number} dist - Distancia en kilómetros
  * @returns {number} Precio base en Bs
  */
 const calculateBeezeroPrice = (dist) => {
   if (dist <= 1) return 10
-  if (dist <= 2) return 12
-  if (dist <= 3) return 14
-  if (dist <= 4) return 16
-  if (dist <= 5) return 18
-  if (dist <= 6) return 20
-  if (dist <= 7) return 22
-  if (dist <= 8) return 24
-  if (dist <= 9) return 26
-  if (dist <= 10) return 28
   
-  // Para distancias mayores a 10km: 28 Bs + 2 Bs por km adicional
-  const kmAdicionales = Math.ceil(dist - 10)
-  return 28 + (kmAdicionales * 2)
+  // Después del primer km: precio base 10 Bs + 3 Bs por cada km adicional
+  const kmAdicionales = dist - 1
+  return 10 + (kmAdicionales * 3)
 }
 
 /**
