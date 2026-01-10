@@ -214,6 +214,13 @@ import authRoutes from './routes/auth.js'
 import clientRoutes from './routes/client.js'
 import notesRoutes from './routes/notes.js'
 
+// Importar sistema de logging
+import logger, { logSystem } from './utils/logger.js'
+import { requestLogger, errorLogger } from './middleware/logging.js'
+
+// Middleware de logging global (antes de las rutas)
+app.use(requestLogger)
+
 // Rutas de autenticación
 app.use('/api/auth', authRoutes)
 
@@ -4759,11 +4766,26 @@ app.put('/api/admin/inventario/:empresa/actualizar', requireInventarioAccess, as
   }
 })
 
+// Middleware de error logging (debe ir al final, después de todas las rutas)
+app.use(errorLogger)
+
+// Manejo de errores global
+app.use((err, req, res, next) => {
+  logSystem.error('Unhandled error', err)
+  res.status(500).json({
+    error: 'Error interno del servidor',
+    details: process.env.NODE_ENV === 'production' ? undefined : err.message
+  })
+})
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 API listening on:`)
   console.log(`   - Local:   http://localhost:${PORT}`)
   console.log(`   - Network: http://0.0.0.0:${PORT}`)
   console.log(`💡 Para acceder desde otros dispositivos en la red, usa tu IP local`)
+  
+  // Log del inicio del servidor
+  logSystem.startup(PORT)
 })
 
 

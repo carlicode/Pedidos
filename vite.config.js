@@ -14,12 +14,6 @@ export default defineConfig({
         target: process.env.VITE_BACKEND_URL || 'http://localhost:5055',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
-          // Log para debug
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('🔄 Proxy request:', req.method, req.url, '→', options.target)
-          })
-        }
       }
     }
   }
