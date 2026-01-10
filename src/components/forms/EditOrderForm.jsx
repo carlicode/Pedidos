@@ -4,9 +4,9 @@ import { calculatePrice } from '../../utils/priceCalculator.js'
 import { calculateDistance } from '../../utils/distanceCalculator.js'
 import { getEmpresaMapa } from '../../utils/dataHelpers.js'
 
-const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, showNotification, empresas }) => {
+const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, showNotification, empresas, currentOperador }) => {
   const [editData, setEditData] = useState({
-    operador: order.operador || '',
+    operador: currentOperador || order.operador || '', // Usar siempre el operador actual
     cliente: order.cliente || '',
     recojo: order.recojo || '',
     entrega: order.entrega || '',
@@ -148,7 +148,8 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onComplete(editData)
+    // Siempre actualizar con el operador actual
+    onComplete({ ...editData, operador: currentOperador })
   }
 
   const handleChange = async (e) => {
@@ -291,10 +292,22 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
             <input 
               type="text" 
               name="operador" 
-              value={editData.operador} 
-              onChange={handleChange} 
-              style={{ width: '100%', padding: '8px', marginTop: '5px' }} 
+              value={currentOperador || editData.operador} 
+              readOnly
+              disabled
+              style={{ 
+                width: '100%', 
+                padding: '8px', 
+                marginTop: '5px',
+                backgroundColor: '#e9ecef',
+                color: '#495057',
+                cursor: 'not-allowed'
+              }} 
+              title={`Se actualizará automáticamente a: ${currentOperador}`}
             />
+            <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+              ℹ️ El operador se actualizará automáticamente al usuario actual ({currentOperador})
+            </small>
           </div>
         </div>
       </div>

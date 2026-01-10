@@ -589,8 +589,16 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Pre-cargar formulario cuando se activa modo edición
   useEffect(() => {
     if (editingOrder) {
+      // Obtener la fecha desde múltiples posibles fuentes y limpiar comillas
+      let fechaOriginal = editingOrder.fecha || editingOrder['Fechas'] || ''
+      
+      // Limpiar comilla simple al inicio (Google Sheets a veces las agrega)
+      if (typeof fechaOriginal === 'string' && fechaOriginal.startsWith("'")) {
+        fechaOriginal = fechaOriginal.substring(1)
+      }
+      
       // Convertir fecha del formato DD/MM/YYYY a yyyy-MM-dd para el input date usando dateService
-      const fechaConvertida = convertToISO(editingOrder.fecha) || editingOrder.fecha
+      const fechaConvertida = convertToISO(fechaOriginal) || fechaOriginal
       
       // Asegurar que tiempo_espera se incluya con todas sus variantes posibles
       const tiempoEspera = editingOrder.tiempo_espera || editingOrder['Tiempo de espera'] || editingOrder['Tiempo de Espera'] || ''
@@ -601,7 +609,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       
       const formData = {
         ...editingOrder,
-        fecha: fechaConvertida, // Usar la fecha convertida
+        fecha: fechaConvertida, // Usar la fecha convertida y limpia
         operador: operadorDefault, // Mantener el operador actual
         tiempo_espera: tiempoEspera, // Asegurar que tiempo_espera esté presente
         info_direccion_recojo: infoRecojo, // Asegurar que info adicional recojo esté presente
@@ -851,7 +859,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   // Función para activar modo edición (reutiliza el formulario de agregar)
   const handleEditMode = (order) => {
-
     setEditingOrder(order)
     setActiveTab('agregar')
     showNotification(`✏️ Editando pedido #${order.id}`, 'info')
@@ -901,18 +908,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Las funciones de Kanban (handleDragStart, handleDragOver, handleDrop, handleStatusChange) 
   // ahora se manejan en el hook useKanban
 
-  // Llenar el formulario cuando se entra en modo edición
-  useEffect(() => {
-    if (editingOrder) {
-      // Llenar el formulario con los datos del pedido a editar
-      setForm({
-        ...editingOrder,
-        // Asegurar que los campos de info adicional se mapeen correctamente
-        info_direccion_recojo: editingOrder.info_direccion_recojo || editingOrder['Info. Adicional Recojo'] || '',
-        info_direccion_entrega: editingOrder.info_direccion_entrega || editingOrder['Info. Adicional Entrega'] || ''
-      })
-    }
-  }, [editingOrder])
+  // NOTA: El useEffect para llenar el formulario en modo edición está en la línea 590-669
+  // No duplicar aquí para evitar sobrescribir la conversión de fechas
 
   // Auto-sync cuando se cambie a la pestaña "Ver pedidos" o "Cobros/Pagos" (solo si no hay datos)
   useEffect(() => {
@@ -2752,6 +2749,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         const updatedOrder = {
           ...editingOrderClean, // Copiar campos originales sin nombres de columnas del sheet
           ...form,         // Sobrescribir con los campos editados del formulario
+          operador: operadorDefault, // IMPORTANTE: Siempre actualizar al operador actual
           fecha: fechaNormalizada, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
           id: editingOrder.id, // Asegurar que el ID no cambie
           fecha_registro: editingOrder.fecha_registro, // Mantener fecha de registro original
@@ -3592,25 +3590,36 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           cursor: 'not-allowed'
                         }}
                       />
-                    </div>
-                    <div className="form-group">
-                      <label style={{marginBottom: '4px', display: 'block', fontWeight: '600'}}>Operador</label>
-                      <input
-                        type="text"
-                        name="operador"
-                        value={form.operador || ''}
-                        onChange={handleChange}
-                        placeholder="Operador"
-                        style={{
-                          width: '100%',
-                          padding: '8px 12px',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          fontSize: '14px'
-                        }}
-                      />
-                    </div>
                   </div>
+                  <div className="form-group">
+                    <label style={{marginBottom: '4px', display: 'block', fontWeight: '600'}}>Operador</label>
+                    <input
+                      type="text"
+                      name="operador"
+                      value={editingOrder ? operadorDefault : (form.operador || '')}
+                      onChange={editingOrder ? null : handleChange}
+                      placeholder="Operador"
+                      readOnly={!!editingOrder}
+                      disabled={!!editingOrder}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #ddd',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        backgroundColor: editingOrder ? '#e9ecef' : 'white',
+                        color: editingOrder ? '#495057' : 'inherit',
+                        cursor: editingOrder ? 'not-allowed' : 'text'
+                      }}
+                      title={editingOrder ? `Se actualizará automáticamente a: ${operadorDefault}` : ''}
+                    />
+                    {editingOrder && (
+                      <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        ℹ️ El operador se actualizará automáticamente al usuario actual ({operadorDefault})
+                      </small>
+                    )}
+                  </div>
+                </div>
                 </div>
               )}
               
@@ -7175,6 +7184,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                 calculateDistanceWrapper={calculateDistanceWrapper}
                 showNotification={showNotification}
                 empresas={empresas}
+                currentOperador={operadorDefault}
               />
             </div>
           </div>

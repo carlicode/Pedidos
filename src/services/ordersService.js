@@ -61,14 +61,20 @@ const headerMap = {
 const convertExcelDate = (excelDate) => {
   if (!excelDate || excelDate === 'N/A') return ''
   
-  // Si ya es una fecha en formato estándar, devolverla
-  if (String(excelDate).includes('/') || String(excelDate).includes('-')) {
-    return String(excelDate)
+  // Limpiar comillas simples al inicio (Google Sheets a veces las agrega para forzar texto)
+  let cleanDate = String(excelDate).trim()
+  if (cleanDate.startsWith("'")) {
+    cleanDate = cleanDate.substring(1)
+  }
+  
+  // Si ya es una fecha en formato estándar, devolverla limpia
+  if (cleanDate.includes('/') || cleanDate.includes('-')) {
+    return cleanDate
   }
   
   // Convertir número de Excel a fecha
-  const excelNum = parseFloat(excelDate)
-  if (isNaN(excelNum)) return String(excelDate)
+  const excelNum = parseFloat(cleanDate)
+  if (isNaN(excelNum)) return cleanDate
   
   // Excel cuenta desde 1900-01-01, pero tiene un bug con 1900 siendo año bisiesto
   const excelEpoch = new Date(1900, 0, 1)
@@ -93,13 +99,16 @@ const convertExcelDate = (excelDate) => {
 export const mapRowToOrder = (rowObj, index = 0, initialOrder = {}, operadorDefault = '') => {
   const mapped = { id: index.toString(), ...initialOrder }
   const entries = Object.entries(rowObj || {})
+  
   for (const [k, v] of entries) {
     if (k.toLowerCase() === 'id') {
       // Si viene un ID del sheet, usarlo, sino usar el índice
       const sheetId = String(v ?? '').trim()
       mapped.id = sheetId && !isNaN(parseInt(sheetId)) ? sheetId : index.toString()
     } else {
-      const key = headerMap[normalize(k)]
+      const normalizedKey = normalize(k)
+      const key = headerMap[normalizedKey]
+      
       if (key) {
         let value = String(v ?? '').trim()
         

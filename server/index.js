@@ -47,6 +47,11 @@ function normalizeDateToDDMMYYYY(dateString) {
   let trimmed = String(dateString).trim()
   if (!trimmed) return ''
   
+  // Limpiar comilla simple al inicio (Google Sheets la agrega a veces para forzar texto)
+  if (trimmed.startsWith("'")) {
+    trimmed = trimmed.substring(1)
+  }
+  
   try {
     // Si ya está en formato DD/MM/YYYY, validar y devolver
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
