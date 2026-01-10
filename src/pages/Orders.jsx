@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import SearchableSelect from '../components/SearchableSelect.jsx'
 import Icon from '../components/Icon.jsx'
 import CotizacionModal from '../components/CotizacionModal.jsx'
+import NotesFloatingButton from '../components/NotesFloatingButton.jsx'
 import TimerModal from '../components/TimerModal.jsx'
 import CerrarTurnoModal from '../components/CerrarTurnoModal.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -8140,6 +8141,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         >
           📊
         </button>
+
+        {/* Botón flotante de Notas del Equipo */}
+        <NotesFloatingButton />
       </div>
       
       {/* Modal de Cotización */}

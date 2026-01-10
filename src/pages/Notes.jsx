@@ -13,13 +13,19 @@ export default function Notes() {
   const { user } = useAuth()
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // 'all', 'pending', 'resolved'
+  const [filter, setFilter] = useState('pending') // 'all', 'pending', 'resolved' - Por defecto 'pending'
   const [showModal, setShowModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState({ show: false, note: null })
   const [showResolveModal, setShowResolveModal] = useState({ show: false, noteId: null })
   const [newNote, setNewNote] = useState({
     descripcion: ''
   })
+  const [editNote, setEditNote] = useState({
+    descripcion: ''
+  })
   const [descripcionResolucion, setDescripcionResolucion] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Obtener usuario actual del hook de autenticación
   const currentUser = user?.username || user?.name || 'Usuario'
@@ -33,28 +39,38 @@ export default function Notes() {
       setLoading(true)
       const response = await fetch('/api/notes')
       
-      if (response.ok) {
-        const data = await response.json()
-        console.log('📝 Notas recibidas del backend:', data.notes)
-        console.log('📝 Primera nota (ejemplo):', data.notes?.[0])
-        setNotes(data.notes || [])
-      } else {
-        throw new Error('Error al cargar notas')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }))
+        console.error('❌ Error del servidor:', response.status, errorData)
+        throw new Error(errorData.error || `Error ${response.status}: Error al cargar notas`)
       }
+      
+      const data = await response.json()
+      console.log('📝 Notas recibidas del backend:', data.notes)
+      console.log('📝 Primera nota (ejemplo):', data.notes?.[0])
+      setNotes(data.notes || [])
     } catch (error) {
-      console.error('Error:', error)
-      toast.error('❌ Error al cargar las notas')
+      console.error('❌ Error cargando notas:', error)
+      toast.error(`❌ Error al cargar las notas: ${error.message}`)
+      // En caso de error, al menos mostrar array vacío
+      setNotes([])
     } finally {
       setLoading(false)
     }
   }
 
   const handleCreateNote = async () => {
+    // Prevenir múltiples llamadas simultáneas
+    if (isCreating) {
+      return
+    }
+
     if (!newNote.descripcion.trim()) {
       toast.warning('⚠️ Por favor escribe una descripción')
       return
     }
 
+    setIsCreating(true)
     try {
       const response = await fetch('/api/notes', {
         method: 'POST',
@@ -77,6 +93,8 @@ export default function Notes() {
     } catch (error) {
       console.error('Error:', error)
       toast.error('❌ Error al crear la nota')
+    } finally {
+      setIsCreating(false)
     }
   }
 
@@ -152,6 +170,54 @@ export default function Notes() {
     }
   }
 
+  const handleEditNote = (note) => {
+    const descripcion = note.descripcion || note.Descripción || note['Descripción'] || ''
+    setEditNote({ descripcion })
+    setShowEditModal({ show: true, note })
+  }
+
+  const handleUpdateNote = async () => {
+    if (isEditing) {
+      return
+    }
+
+    if (!editNote.descripcion.trim()) {
+      toast.warning('⚠️ Por favor escribe una descripción')
+      return
+    }
+
+    if (!showEditModal.note) {
+      return
+    }
+
+    const noteId = showEditModal.note.id || showEditModal.note.ID || showEditModal.note['ID']
+    
+    setIsEditing(true)
+    try {
+      const response = await fetch(`/api/notes/${noteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          descripcion: editNote.descripcion
+        })
+      })
+
+      if (response.ok) {
+        toast.success('✅ Nota actualizada exitosamente')
+        setShowEditModal({ show: false, note: null })
+        setEditNote({ descripcion: '' })
+        loadNotes()
+      } else {
+        throw new Error('Error al actualizar nota')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('❌ Error al actualizar la nota')
+    } finally {
+      setIsEditing(false)
+    }
+  }
+
   // Filtrar notas (excluir eliminadas)
   const filteredNotes = notes.filter(note => {
     // Intentar múltiples formas de acceder al estado
@@ -199,16 +265,16 @@ export default function Notes() {
       {/* Filtros */}
       <div className="notes-filters">
         <button 
-          className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          Todas ({notes.length})
-        </button>
-        <button 
           className={`filter-btn ${filter === 'pending' ? 'active' : ''}`}
           onClick={() => setFilter('pending')}
         >
           Pendientes ({pendingCount})
+        </button>
+        <button 
+          className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          Todas ({notes.length})
         </button>
         <button 
           className={`filter-btn ${filter === 'resolved' ? 'active' : ''}`}
@@ -285,6 +351,12 @@ export default function Notes() {
                     {estado !== 'Resuelto' ? (
                       <>
                         <button 
+                          className="btn-edit"
+                          onClick={() => handleEditNote(note)}
+                        >
+                          ✏️ Editar
+                        </button>
+                        <button 
                           className="btn-resolve"
                           onClick={() => setShowResolveModal({ show: true, noteId: id })}
                         >
@@ -357,10 +429,16 @@ export default function Notes() {
                 Cancelar
               </button>
               <button 
+                type="button"
                 className="btn btn-primary"
-                onClick={handleCreateNote}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleCreateNote()
+                }}
+                disabled={isCreating}
               >
-                💾 Crear Nota
+                {isCreating ? '⏳ Creando...' : '💾 Crear Nota'}
               </button>
             </div>
           </div>
@@ -425,6 +503,66 @@ export default function Notes() {
                 onClick={handleResolveNote}
               >
                 ✅ Marcar como Resuelta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para editar nota */}
+      {showEditModal.show && showEditModal.note && (
+        <div className="modal-overlay" onClick={() => {
+          setShowEditModal({ show: false, note: null })
+          setEditNote({ descripcion: '' })
+        }}>
+          <div className="modal-content note-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>✏️ Editar Nota</h2>
+              <button 
+                className="modal-close"
+                onClick={() => {
+                  setShowEditModal({ show: false, note: null })
+                  setEditNote({ descripcion: '' })
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Descripción de la Nota: *</label>
+                <textarea
+                  value={editNote.descripcion}
+                  onChange={(e) => setEditNote({ ...editNote, descripcion: e.target.value })}
+                  placeholder="Escribe aquí tu nota para el equipo..."
+                  rows={6}
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
+                />
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowEditModal({ show: false, note: null })
+                  setEditNote({ descripcion: '' })
+                }}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button"
+                className="btn btn-primary"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleUpdateNote()
+                }}
+                disabled={isEditing}
+              >
+                {isEditing ? '⏳ Guardando...' : '💾 Guardar Cambios'}
               </button>
             </div>
           </div>

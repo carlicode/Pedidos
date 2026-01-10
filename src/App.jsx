@@ -13,7 +13,6 @@ import InventarioAdmin from './pages/InventarioAdmin.jsx'
 import Unauthorized from './pages/Unauthorized.jsx'
 import Notes from './pages/Notes.jsx'
 import Icon from './components/Icon.jsx'
-import NotesFloatingButton from './components/NotesFloatingButton.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
 export default function App() {
@@ -128,9 +127,6 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        
-        {/* Burbuja flotante de notas - visible en todas las páginas cuando el usuario está autenticado, excepto en /notas */}
-        {isAuthenticated && showHeader && location.pathname !== '/notas' && <NotesFloatingButton />}
       </main>
 
       {showHeader && (

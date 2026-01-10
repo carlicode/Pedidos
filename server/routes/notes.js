@@ -398,6 +398,86 @@ router.put('/:id/resolve', async (req, res) => {
 });
 
 /**
+ * PUT /api/notes/:id
+ * Actualizar nota (solo descripción para notas pendientes)
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id;
+    const { descripcion } = req.body;
+    
+    if (!noteId) {
+      return res.status(400).json({ error: 'ID de nota es requerido' });
+    }
+    
+    if (!descripcion) {
+      return res.status(400).json({ error: 'Descripción es requerida' });
+    }
+    
+    const SHEET_ID = getSheetId();
+    if (!SHEET_ID) {
+      return res.status(400).json({ error: 'SHEET_ID no configurado' });
+    }
+    
+    const auth = await getAuthClient();
+    await auth.authorize();
+    const sheets = google.sheets({ version: 'v4', auth });
+    
+    const notesSheetName = 'Notas';
+    const quotedNotes = quoteSheet(notesSheetName);
+    
+    // Leer todas las notas para encontrar la fila
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${quotedNotes}!A:H`
+    });
+    
+    const rows = response.data.values || [];
+    const dataRows = rows.slice(1);
+    
+    // Buscar la fila con el ID especificado
+    const rowIndex = dataRows.findIndex(row => row[0] === noteId.toString());
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ error: `Nota #${noteId} no encontrada` });
+    }
+    
+    // Calcular el número de fila en el sheet
+    const sheetRow = rowIndex + 2;
+    
+    // Verificar que la nota esté pendiente (solo se pueden editar pendientes)
+    const estado = dataRows[rowIndex][1] || ''; // Columna B (Estado)
+    if (estado.toLowerCase() !== 'pendiente') {
+      return res.status(400).json({ error: 'Solo se pueden editar notas pendientes' });
+    }
+    
+    // Actualizar solo la descripción (columna E)
+    // Nueva estructura: ID (A), Estado (B), Fecha Creación (C), Operador (D), Descripción (E), Resuelto por (F), Fecha Resolución (G), Descripción resolución (H)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${quotedNotes}!E${sheetRow}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[descripcion]]
+      }
+    });
+    
+    console.log(`✅ Nota #${noteId} actualizada`);
+    res.json({ 
+      success: true, 
+      message: `Nota #${noteId} actualizada exitosamente` 
+    });
+    
+  } catch (error) {
+    console.error('❌ Error actualizando nota:', error);
+    res.status(500).json({ 
+      error: 'Error actualizando nota', 
+      details: error.message 
+    });
+  }
+});
+
+/**
  * PUT /api/notes/:id/unresolve
  * Marcar nota como pendiente (deshacer resolución)
  */

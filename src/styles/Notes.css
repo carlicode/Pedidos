@@ -235,7 +235,8 @@
 
 .btn-resolve,
 .btn-unresolve,
-.btn-delete {
+.btn-delete,
+.btn-edit {
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
@@ -243,6 +244,16 @@
   font-size: 14px;
   font-weight: 600;
   transition: all 0.2s;
+}
+
+.btn-edit {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
 }
 
 .btn-resolve {
