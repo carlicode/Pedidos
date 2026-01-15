@@ -81,7 +81,9 @@ Beezy App es una aplicación web completa para gestionar pedidos, entregas, inve
 ## 📦 Instalación
 
 ### Requisitos Previos
-- Node.js (v16 o superior)
+- **Node.js**: v20.18.0 LTS (recomendado) o v18.x LTS (mínimo)
+  - Usa `nvm` para gestionar versiones: `nvm use` (lee automáticamente `.nvmrc`)
+  - Descarga: https://nodejs.org/
 - npm o yarn
 - Cuenta de Google Cloud con APIs habilitadas:
   - Google Maps Distance Matrix API

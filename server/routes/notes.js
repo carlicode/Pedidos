@@ -175,8 +175,19 @@ router.get('/pending-count', async (req, res) => {
       return res.status(400).json({ error: 'SHEET_ID no configurado' });
     }
     
-    const auth = await getAuthClient();
+    let auth;
+    try {
+      auth = await getAuthClient();
     await auth.authorize();
+    } catch (authError) {
+      // Si hay problemas de conectividad (DNS, red, etc.), retornar 0 silenciosamente
+      if (authError.code === 'ENOTFOUND' || authError.code === 'ECONNREFUSED' || authError.code === 'ETIMEDOUT') {
+        console.warn('⚠️ Sin conexión a internet. Retornando contador 0 para notas pendientes.');
+        return res.json({ count: 0 });
+      }
+      throw authError;
+    }
+    
     const sheets = google.sheets({ version: 'v4', auth });
     
     const notesSheetName = 'Notas';
@@ -193,6 +204,11 @@ router.get('/pending-count', async (req, res) => {
       // Si la pestaña no existe, retornar 0 pendientes
       if (sheetError.message && (sheetError.message.includes('Unable to parse range') || sheetError.message.includes('not found'))) {
         console.warn(`⚠️ La pestaña "${notesSheetName}" no existe aún. Retornando 0 pendientes.`);
+        return res.json({ count: 0 });
+      }
+      // Si hay problemas de conectividad al leer el sheet, retornar 0
+      if (sheetError.code === 'ENOTFOUND' || sheetError.code === 'ECONNREFUSED' || sheetError.code === 'ETIMEDOUT') {
+        console.warn('⚠️ Sin conexión a Google Sheets. Retornando contador 0.');
         return res.json({ count: 0 });
       }
       throw sheetError;
@@ -216,8 +232,15 @@ router.get('/pending-count', async (req, res) => {
     res.json({ count: pendingCount });
     
   } catch (error) {
-    console.error('❌ Error obteniendo contador:', error);
-    res.status(500).json({ error: 'Error obteniendo contador', details: error.message });
+    // Si es un error de conectividad, retornar 0 en lugar de error 500
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      console.warn('⚠️ Error de conectividad obteniendo contador de notas. Retornando 0.');
+      return res.json({ count: 0 });
+    }
+    
+    // Para otros errores, loguear pero también retornar 0 para no romper la UI
+    console.error('❌ Error obteniendo contador:', error.message || error);
+    return res.json({ count: 0 });
   }
 });
 

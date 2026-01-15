@@ -5,6 +5,7 @@
 
 import { getBackendUrl, getApiUrl } from '../utils/api.js'
 import { formatToStandardDate, prepareDateForSheet } from './dateService.js'
+import { SHEET_COLUMNS } from '../constants/sheetColumns.js'
 
 /**
  * Normaliza un string eliminando acentos, caracteres especiales y convirtiendo a minúsculas
@@ -190,44 +191,39 @@ export const filterOrderForSheet = (order) => {
     }
   }
   
+  // Usar constantes centralizadas para garantizar consistencia
   return {
-    'ID': order.id,
-    'Fecha Registro': currentDate, // Con RAW no necesitamos comilla simple
-    'Hora Registro': currentTime,  // Con RAW no necesitamos comilla simple
-    'Operador': order.operador,
-    'Cliente': order.cliente,
-    'Recojo': recojoFinal,
-    'Entrega': entregaFinal,
-    'Direccion Recojo': order.direccion_recojo,
-    'Direccion Entrega': order.direccion_entrega,
-    'Detalles de la Carrera': order.detalles_carrera,
-    'Dist. [Km]': order.distancia_km,
-    'Medio Transporte': order.medio_transporte,
-    'Precio [Bs]': order.precio_bs,
-    'Método pago pago': order.metodo_pago,
-    'Biker': order.biker,
-    'WhatsApp': order.whatsapp,
-    'Fechas': (() => {
-      // Usar el servicio centralizado de fechas para GARANTIZAR consistencia
-      console.log(`📅 [Fechas] Valor original de order.fecha: "${order.fecha}"`)
-      const fechaConvertida = prepareDateForSheet(order.fecha, currentDate)
-      console.log(`📅 [Fechas] Valor final que se enviará: "${fechaConvertida}"`)
-      return fechaConvertida
-    })(),
-    'Hora Ini': formatTimeForSheet(order.hora_ini), // Con RAW no necesitamos comilla simple
-    'Hora Fin': formatTimeForSheet(order.hora_fin), // Con RAW no necesitamos comilla simple
-    'Duracion': order.duracion,
-    'Estado': order.estado || 'Pendiente',
-    'Estado de pago': order.estado_pago || 'Debe Cliente',
-    'Observaciones': order.observaciones,
-    'Pago biker': order.pago_biker,
-    'Dia de la semana': order.dia_semana,
-    'Cobro o pago': order.cobro_pago || '',
-    'Monto cobro o pago': order.monto_cobro_pago || '',
-    'Descripcion de cobro o pago': order.descripcion_cobro_pago || '',
-    'Info. Adicional Recojo': order.info_direccion_recojo || '',
-    'Info. Adicional Entrega': order.info_direccion_entrega || '',
-    'Tiempo de espera': order.tiempo_espera || ''
+    [SHEET_COLUMNS.ID]: order.id,
+    [SHEET_COLUMNS.FECHA_REGISTRO]: currentDate,
+    [SHEET_COLUMNS.HORA_REGISTRO]: currentTime,
+    [SHEET_COLUMNS.OPERADOR]: order.operador,
+    [SHEET_COLUMNS.CLIENTE]: order.cliente,
+    [SHEET_COLUMNS.RECOJO]: recojoFinal,
+    [SHEET_COLUMNS.ENTREGA]: entregaFinal,
+    [SHEET_COLUMNS.DIRECCION_RECOJO]: order.direccion_recojo,
+    [SHEET_COLUMNS.DIRECCION_ENTREGA]: order.direccion_entrega,
+    [SHEET_COLUMNS.DETALLES_CARRERA]: order.detalles_carrera,
+    [SHEET_COLUMNS.DISTANCIA_KM]: order.distancia_km,
+    [SHEET_COLUMNS.MEDIO_TRANSPORTE]: order.medio_transporte,
+    [SHEET_COLUMNS.PRECIO_BS]: order.precio_bs,
+    [SHEET_COLUMNS.METODO_PAGO]: order.metodo_pago,
+    [SHEET_COLUMNS.BIKER]: order.biker || '',
+    [SHEET_COLUMNS.WHATSAPP]: order.whatsapp,
+    [SHEET_COLUMNS.FECHAS]: prepareDateForSheet(order.fecha, currentDate),
+    [SHEET_COLUMNS.HORA_INI]: formatTimeForSheet(order.hora_ini),
+    [SHEET_COLUMNS.HORA_FIN]: formatTimeForSheet(order.hora_fin),
+    [SHEET_COLUMNS.DURACION]: order.duracion,
+    [SHEET_COLUMNS.TIEMPO_ESPERA]: order.tiempo_espera || '',
+    [SHEET_COLUMNS.ESTADO]: order.estado || 'Pendiente',
+    [SHEET_COLUMNS.ESTADO_PAGO]: order.estado_pago || 'Debe Cliente',
+    [SHEET_COLUMNS.OBSERVACIONES]: order.observaciones,
+    [SHEET_COLUMNS.PAGO_BIKER]: order.pago_biker,
+    [SHEET_COLUMNS.DIA_SEMANA]: order.dia_semana,
+    [SHEET_COLUMNS.COBRO_PAGO]: order.cobro_pago || '',
+    [SHEET_COLUMNS.MONTO_COBRO_PAGO]: order.monto_cobro_pago || '',
+    [SHEET_COLUMNS.DESCRIPCION_COBRO_PAGO]: order.descripcion_cobro_pago || '',
+    [SHEET_COLUMNS.INFO_ADICIONAL_RECOJO]: order.info_direccion_recojo || '',
+    [SHEET_COLUMNS.INFO_ADICIONAL_ENTREGA]: order.info_direccion_entrega || ''
   }
 }
 
@@ -268,63 +264,25 @@ export const saveOrderToSheet = async (order, silent = false, SHEET_URL, SHEET_T
 
 /**
  * Actualiza un pedido en Google Sheets
+ * IMPORTANTE: Ahora usa filterOrderForSheet para garantizar consistencia con saveOrderToSheet
  * @param {Object} order - Pedido a actualizar
  * @returns {Promise<Object>} Respuesta del servidor
  * @throws {Error} Si falla la actualización
  */
 export const updateOrderInSheet = async (order) => {
-  // Usar el endpoint específico para actualizar pedidos
-  const updateUrl = getApiUrl('/api/update-order-status')
+  // Usar el nuevo endpoint unificado para actualizar pedidos
+  const updateUrl = getApiUrl('/api/orders/' + order.id)
 
-  // Preparar datos para el endpoint de actualización
-  const updateData = {
-    orderId: String(order.id),
-    newStatus: order.estado || 'En proceso',
-    additionalData: {
-      operador: order.operador,
-      cliente: order.cliente,
-      recojo: order.recojo,
-      entrega: order.entrega,
-      direccion_recojo: order.direccion_recojo,
-      info_direccion_recojo: order.info_direccion_recojo !== undefined && order.info_direccion_recojo !== null 
-        ? String(order.info_direccion_recojo) 
-        : (order['Info. Adicional Recojo'] !== undefined && order['Info. Adicional Recojo'] !== null 
-          ? String(order['Info. Adicional Recojo']) 
-          : ''),
-      direccion_entrega: order.direccion_entrega,
-      info_direccion_entrega: order.info_direccion_entrega !== undefined && order.info_direccion_entrega !== null 
-        ? String(order.info_direccion_entrega) 
-        : (order['Info. Adicional Entrega'] !== undefined && order['Info. Adicional Entrega'] !== null 
-          ? String(order['Info. Adicional Entrega']) 
-          : ''),
-      detalles_carrera: order.detalles_carrera,
-      distancia: order.distancia || order.distancia_km,
-      medio_transporte: order.medio_transporte,
-      precio: order.precio || order.precio_bs,
-      metodo_pago: order.metodo_pago,
-      estado_pago: order.estado_pago,
-      biker: order.biker,
-      whatsapp: order.whatsapp,
-      fecha: order.fecha,
-      hora_ini: order.hora_ini,
-      hora_fin: order.hora_fin,
-      duracion: order.duracion,
-      tiempo_espera: order.tiempo_espera || order['Tiempo de espera'] || order['Tiempo de Espera'] || '',
-      observaciones: order.observaciones,
-      pago_biker: order.pago_biker,
-      dia_semana: order.dia_semana,
-      cobro_pago: order.cobro_pago,
-      monto_cobro_pago: order.monto_cobro_pago,
-      descripcion_cobro_pago: order.descripcion_cobro_pago
-    }
-  }
+  // Usar el MISMO filtro que para crear pedidos
+  // Esto garantiza que TODOS los campos (incluido biker) se formateen correctamente
+  const filteredOrder = filterOrderForSheet(order)
   
   const res = await fetch(updateUrl, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(updateData)
+    body: JSON.stringify(filteredOrder)
   })
 
   if (res.ok) {
@@ -348,6 +306,15 @@ export const loadOrdersFromSheet = async () => {
   const res = await fetch(readUrl, { cache: 'no-store' })
 
   if (!res.ok) {
+    // Si es error 503 (sin conexión), lanzar error especial
+    if (res.status === 503) {
+      const errorData = await res.json().catch(() => ({}))
+      const error = new Error(errorData.message || 'Sin conexión a internet')
+      error.code = 'NO_CONNECTION'
+      error.status = 503
+      throw error
+    }
+    
     const errorText = await res.text()
     throw new Error(`Error al cargar datos: ${res.status}`)
   }

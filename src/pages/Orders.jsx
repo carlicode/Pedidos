@@ -106,6 +106,7 @@ const initialOrder = {
   hora_registro: '',
   operador: 'Usuario', // Valor por defecto, se actualizará con operadorDefault
   cliente: '',
+  medio_transporte: 'Bicicleta', // Valor por defecto
   recojo: '',
   entrega: '',
   direccion_recojo: '',
@@ -114,7 +115,6 @@ const initialOrder = {
   info_direccion_entrega: '', // Información adicional para la entrega
   detalles_carrera: '',
   distancia_km: '',
-  medio_transporte: '',
   precio_bs: '',
   metodo_pago: '',
   estado_pago: 'Debe Cliente',
@@ -292,6 +292,8 @@ export default function Orders() {
     formatearTiempo
   } = useTimer()
   const [dataLoaded, setDataLoaded] = useState(false)
+  const [connectionError, setConnectionError] = useState(false)
+  const [lastConnectionErrorTime, setLastConnectionErrorTime] = useState(null)
   const [deliveryModal, setDeliveryModal] = useState({ show: false, order: null })
   const [cancelModal, setCancelModal] = useState({ show: false, order: null })
   const [editModal, setEditModal] = useState({ show: false, order: null })
@@ -393,11 +395,19 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     return user?.name || 'Usuario'
   }, [user])
 
+  // Cargar datos iniciales desde localStorage (como caché rápido)
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('orders.list') || '[]')
-      setOrders(stored)
-    } catch {}
+      if (stored && stored.length > 0) {
+        console.log(`📦 Cargando ${stored.length} pedidos desde caché localStorage`)
+        setOrders(stored)
+        // Marcar como cargados temporalmente para evitar pantalla vacía
+        // El useEffect principal recargará desde la API cuando sea necesario
+      }
+    } catch (error) {
+      console.warn('⚠️ Error al cargar caché localStorage:', error)
+    }
   }, [])
 
   // Cargar empresas y bikers cuando se active la pestaña "Agregar Nuevo"
@@ -607,14 +617,58 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       const infoRecojo = editingOrder.info_direccion_recojo || editingOrder['Info. Adicional Recojo'] || ''
       const infoEntrega = editingOrder.info_direccion_entrega || editingOrder['Info. Adicional Entrega'] || ''
       
+      // Asegurar que biker se incluya con todas sus variantes posibles (nombre de campo o nombre de columna)
+      const bikerValue = editingOrder.biker || editingOrder['Biker'] || editingOrder.Biker || ''
+      
+      // Asegurar que precio_bs se incluya con todas sus variantes posibles
+      // IMPORTANTE: NO calcular, solo cargar el valor existente
+      // Buscar en todas las posibles variantes del nombre (incluyendo nombres exactos del sheet)
+      let precioValue = ''
+      
+      // Buscar en orden de prioridad
+      if (editingOrder.precio_bs !== undefined && editingOrder.precio_bs !== null && editingOrder.precio_bs !== '') {
+        precioValue = editingOrder.precio_bs
+      } else if (editingOrder['Precio [Bs]'] !== undefined && editingOrder['Precio [Bs]'] !== null && editingOrder['Precio [Bs]'] !== '') {
+        precioValue = editingOrder['Precio [Bs]']
+      } else if (editingOrder.precio !== undefined && editingOrder.precio !== null && editingOrder.precio !== '') {
+        precioValue = editingOrder.precio
+      }
+      
+      // Convertir a string y limpiar
+      precioValue = String(precioValue || '').trim()
+      
+      // Normalizar formato: convertir coma a punto (formato europeo a formato numérico estándar)
+      if (precioValue.includes(',')) {
+        precioValue = precioValue.replace(',', '.')
+      }
+      
+      // Asegurar que distancia_km se incluya con todas sus variantes posibles
+      const distanciaValue = editingOrder.distancia_km || editingOrder['Dist. [Km]'] || editingOrder.distancia || ''
+      
+      // Asegurar que medio_transporte se incluya
+      const medioTransporteValue = editingOrder.medio_transporte || editingOrder['Medio Transporte'] || editingOrder.medioTransporte || ''
+      
+      // Asegurar que metodo_pago se incluya
+      const metodoPagoValue = editingOrder.metodo_pago || editingOrder['Método pago pago'] || editingOrder.metodoPago || ''
+      
+      // Crear formData asegurando que los campos importantes se mapeen correctamente
+      // IMPORTANTE: Asignar precio_bs DESPUÉS del spread para que no se sobrescriba
       const formData = {
         ...editingOrder,
         fecha: fechaConvertida, // Usar la fecha convertida y limpia
         operador: operadorDefault, // Mantener el operador actual
         tiempo_espera: tiempoEspera, // Asegurar que tiempo_espera esté presente
         info_direccion_recojo: infoRecojo, // Asegurar que info adicional recojo esté presente
-        info_direccion_entrega: infoEntrega // Asegurar que info adicional entrega esté presente
+        info_direccion_entrega: infoEntrega, // Asegurar que info adicional entrega esté presente
+        biker: bikerValue, // Asegurar que biker esté presente con el nombre correcto del campo
+        distancia_km: distanciaValue, // Asegurar que distancia_km esté presente
+        medio_transporte: medioTransporteValue, // Asegurar que medio_transporte esté presente
+        metodo_pago: metodoPagoValue // Asegurar que metodo_pago esté presente
       }
+      
+      // IMPORTANTE: Asignar precio_bs al final para garantizar que no se sobrescriba
+      // y que use el valor encontrado en lugar del que pueda venir en editingOrder
+      formData.precio_bs = precioValue
 
       // Si hay mapas válidos en las direcciones, NO puede ser "Cliente avisa"
       // Corregir el nombre si es necesario
@@ -642,6 +696,13 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       formData.entrega = entregaFinal
       
       setForm(formData)
+      
+      // IMPORTANTE: Marcar precio como editado manualmente para evitar recálculos automáticos
+      // Al editar, queremos cargar el precio tal como está, sin recalcular
+      if (precioValue && precioValue !== '' && precioValue !== '0' && precioValue !== 0) {
+        setPrecioEditadoManualmente(true)
+      }
+      
       // Detectar y configurar los modos de entrada (pasando también las direcciones)
       const recojoManualMode = detectInputMode(recojoFinal, direccionRecojo)
       const entregaManualMode = detectInputMode(entregaFinal, direccionEntrega)
@@ -796,61 +857,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     showNotification('❌ Cancelación cancelada', 'info')
   }
 
-  const handleOrderEdit = async (updatedOrder) => {
-    try {
-      // Validar que tengamos el pedido actualizado con ID
-      if (!updatedOrder || !updatedOrder.id) {
-        throw new Error('No se proporcionó un pedido válido para actualizar')
-      }
-      
-      // Log: Inicio de edición de pedido
-      await logToCSV('order_edit_start', { 
-        orderId: updatedOrder.id,
-        updatedData: updatedOrder
-      }, 'info')
-      
-      showNotification(`🔄 Actualizando pedido #${updatedOrder.id}...`, 'info')
-
-      // Actualizar localmente
-      setOrders(prevOrders => {
-        const updatedOrders = prevOrders.map(o => 
-          o.id === updatedOrder.id ? updatedOrder : o
-        )
-        
-        // Limpiar duplicados por ID (mantener solo el último)
-        const uniqueOrders = updatedOrders.reduce((acc, current) => {
-          const existingIndex = acc.findIndex(item => item.id === current.id)
-          if (existingIndex >= 0) {
-            acc[existingIndex] = current // Reemplazar con la versión más reciente
-          } else {
-            acc.push(current)
-          }
-          return acc
-        }, [])
-
-        return uniqueOrders
-      })
-      
-      // Actualizar en Google Sheet usando updateOrderInSheet
-      try {
-
-        await updateOrderInSheet(updatedOrder)
-
-      } catch (err) {
-
-        throw err // Re-lanzar el error para que lo maneje el caller
-      }
-      
-      // Cerrar modal si existe (compatibilidad con modal antiguo)
-      if (editModal.show) {
-        setEditModal({ show: false, order: null })
-      }
-      
-    } catch (err) {
-
-      throw err // Re-lanzar para que handleAdd lo capture
-    }
-  }
+  // NOTA: handleOrderEdit fue eliminado - ahora todo se maneja en handleAdd
+  // Esto elimina duplicación y garantiza que crear y editar usen la misma lógica
 
   const handleEditModalClose = () => {
     setEditModal({ show: false, order: null })
@@ -911,13 +919,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // NOTA: El useEffect para llenar el formulario en modo edición está en la línea 590-669
   // No duplicar aquí para evitar sobrescribir la conversión de fechas
 
-  // Auto-sync cuando se cambie a la pestaña "Ver pedidos" o "Cobros/Pagos" (solo si no hay datos)
+  // Auto-sync cuando se cambie a la pestaña "Ver pedidos" o "Cobros/Pagos"
   useEffect(() => {
-    if ((activeTab === 'ver' || activeTab === 'cobros-pagos' || activeTab === 'cuentas-biker') && !dataLoaded) {
-
+    // Cargar cuando:
+    // 1. Se cambia a una pestaña que necesita datos Y no están cargados
+    // 2. O cuando no hay pedidos (orders.length === 0)
+    // 3. PERO no intentar si hay un error de conexión reciente (menos de 30 segundos)
+    const needsData = activeTab === 'ver' || activeTab === 'cobros-pagos' || activeTab === 'cuentas-biker'
+    const timeSinceLastError = lastConnectionErrorTime ? Date.now() - lastConnectionErrorTime : Infinity
+    const shouldRetry = timeSinceLastError > 30000 // Esperar 30 segundos antes de reintentar
+    
+    const shouldLoad = needsData && (!dataLoaded || orders.length === 0) && shouldRetry && !connectionError
+    
+    if (shouldLoad && !loading) {
+      console.log('🔄 Cargando pedidos...', { activeTab, dataLoaded, ordersCount: orders.length })
       loadOrdersFromSheet()
     }
-  }, [activeTab, dataLoaded])
+  }, [activeTab, dataLoaded, orders.length, loading, connectionError, lastConnectionErrorTime])
 
   // useEffect específico para Cuentas Biker - Cargar bikers y calcular con fecha actual de Bolivia
   useEffect(() => {
@@ -1038,23 +1056,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     return () => clearInterval(interval)
   }, [activeTab, orders])
 
-  // Actualizar datos cuando se cambie al Kanban (con caché inteligente)
-  useEffect(() => {
-    if (activeTab === 'ver') {
-      // Solo recargar si no hay datos o si han pasado más de 30 segundos desde la última carga
-      const lastLoadTime = localStorage.getItem('orders.lastLoadTime')
-      const timeSinceLastLoad = lastLoadTime ? Date.now() - parseInt(lastLoadTime) : Infinity
-      const shouldReload = !dataLoaded || orders.length === 0 || timeSinceLastLoad > 30000 // 30 segundos
-
-      if (shouldReload) {
-      setDataLoaded(false) // Resetear estado
-      setTimeout(() => {
-          loadOrdersFromSheet(true) // Recarga forzada
-          localStorage.setItem('orders.lastLoadTime', Date.now().toString())
-      }, 100)
-      }
-    }
-  }, [activeTab])
+  // ⚠️ REMOVIDO: useEffect duplicado que causaba condición de carrera
+  // La lógica de carga está ahora unificada en el useEffect de las líneas 915-920
 
   const loadClientes = async () => {
     try {
@@ -2272,38 +2275,36 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       const distance = await calculateDistanceWrapper(cleanRecojo, cleanEntrega)
 
       if (distance) {
-        // Calcular precio solo si tenemos medio de transporte y no es Cuenta
-        if (medioTransporte && medioTransporte.trim() !== '') {
-          // Verificar si el método de pago actual es Cuenta
-          const metodoPagoActual = form.metodo_pago || 'Efectivo'
+        // Usar "Bicicleta" por defecto si no hay medio de transporte
+        const medioTransporteActual = medioTransporte && medioTransporte.trim() !== '' ? medioTransporte : 'Bicicleta'
+        
+        // Verificar si el método de pago actual es Cuenta
+        const metodoPagoActual = form.metodo_pago || 'Efectivo'
+        
+        // Siempre calcular el precio para guardarlo en el sheet
+        const precio = calculatePrice(distance, medioTransporteActual)
           
-          // Siempre calcular el precio para guardarlo en el sheet
-          const precio = calculatePrice(distance, medioTransporte)
-          
-          if (metodoPagoActual === 'Cuenta' || metodoPagoActual === 'A cuenta') {
-            // Para "Cuenta" o "A cuenta", guardar el precio calculado pero mostrar el método del cliente
-            setForm((prev) => ({ 
-              ...prev, 
-              distancia_km: distance,
-              precio_bs: precio // Guardar el precio real en el sheet
-            }))
-            showNotification(`📏 Distancia: ${distance} km • 💳 Precio calculado: ${precio} Bs (${metodoPagoActual} del cliente)`, 'success')
-          } else {
-            setForm((prev) => ({ 
-              ...prev, 
-              distancia_km: distance,
-              precio_bs: precio 
-            }))
-            showNotification(`📏 Distancia: ${distance} km • 💰 Precio: ${precio} Bs`, 'success')
-          }
-        } else {
-          // Solo actualizar distancia
-
+        // IMPORTANTE: Resetear flag de precio editado manualmente cuando se recalcula distancia
+        // Esto permite que el precio se recalcule automáticamente en modo edición
+        setPrecioEditadoManualmente(false)
+        
+        if (metodoPagoActual === 'Cuenta' || metodoPagoActual === 'A cuenta') {
+          // Para "Cuenta" o "A cuenta", guardar el precio calculado pero mostrar el método del cliente
           setForm((prev) => ({ 
             ...prev, 
-            distancia_km: distance
+            distancia_km: distance,
+            medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
+            precio_bs: precio // Guardar el precio real en el sheet
           }))
-          showNotification(`📏 Distancia calculada: ${distance} km`, 'success')
+          showNotification(`📏 Distancia: ${distance} km • 💳 Precio calculado: ${precio} Bs (${metodoPagoActual} del cliente)`, 'success')
+        } else {
+          setForm((prev) => ({ 
+            ...prev, 
+            distancia_km: distance,
+            medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
+            precio_bs: precio 
+          }))
+          showNotification(`📏 Distancia: ${distance} km • 💰 Precio: ${precio} Bs`, 'success')
         }
       } else {
         // Mostrar modal de error (el error ya está guardado en lastDistanceError)
@@ -2542,21 +2543,24 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       }
       
       // CALCULAR PRECIO: Necesita distancia + medio de transporte (excepto si es Cuenta)
+      // IMPORTANTE: Al cambiar el medio de transporte, SIEMPRE recalcular el precio si hay distancia
+      // Esto aplica tanto en modo crear como en modo edición
       else if (name === 'medio_transporte' && form.distancia_km && tieneMedioTransporte && !recojoClienteAvisa && !entregaClienteAvisa) {
-        if (newForm.metodo_pago === 'Cuenta') {
-
-          const precio = calculatePrice(form.distancia_km, value)
-          setForm((prev) => ({ ...prev, precio_bs: precio }))
-          setPrecioEditadoManualmente(false) // Resetear flag
-          showNotification(`💳 Precio calculado: ${precio} Bs (Cuenta del cliente)`, 'success')
-        } else if (!precioEditadoManualmente) {
-
-          const precio = calculatePrice(form.distancia_km, value)
-          setForm((prev) => ({ ...prev, precio_bs: precio }))
-          showNotification(`💰 Precio actualizado: ${precio} Bs`, 'success')
-        } else {
-
-          showNotification('✏️ Precio editado manualmente: No se recalcula automáticamente', 'info')
+        const distanciaValue = parseFloat(form.distancia_km) || 0
+        
+        if (distanciaValue > 0) {
+          const precio = calculatePrice(distanciaValue, value)
+          
+          if (newForm.metodo_pago === 'Cuenta' || newForm.metodo_pago === 'A cuenta') {
+            setForm((prev) => ({ ...prev, precio_bs: precio }))
+            setPrecioEditadoManualmente(false) // Resetear flag al cambiar transporte
+            showNotification(`💳 Precio calculado: ${precio} Bs (${newForm.metodo_pago} del cliente)`, 'success')
+          } else {
+            // Para otros métodos, recalcular siempre que cambie el transporte
+            setForm((prev) => ({ ...prev, precio_bs: precio }))
+            setPrecioEditadoManualmente(false) // Resetear flag al cambiar transporte
+            showNotification(`💰 Precio recalculado: ${precio} Bs (${value})`, 'success')
+          }
         }
       }
       
@@ -2718,114 +2722,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   const handleAdd = async (e) => {
     e.preventDefault()
     
-    // MODO EDICIÓN: Si estamos editando, usar la función de edición
-    if (editingOrder) {
-
-      // Validar formulario
-      const validationErrors = validateFormWrapper()
-      if (validationErrors.length > 0) {
-        const errorMessage = `Por favor, corrija los siguientes errores:\n\n${validationErrors.map(error => `• ${error}`).join('\n')}`
-        showNotification(errorMessage, 'error')
-        const firstErrorField = document.querySelector('.field-required')
-        if (firstErrorField) {
-          firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          firstErrorField.focus()
-        }
-        return
-      }
-      
-      // Activar estado de carga
-      setIsAddingOrder(true)
-      showNotification('🔄 Guardando cambios...', 'info')
-      
-      try {
-        // Normalizar la fecha al formato estándar DD/MM/YYYY antes de editar
-        const fechaNormalizada = formatToStandardDate(form.fecha)
-        console.log(`📅 [Editar Pedido] Fecha normalizada: "${form.fecha}" -> "${fechaNormalizada}"`)
-        
-        // Mantener TODOS los campos del pedido original y sobrescribir solo los editados
-        // Primero copiar editingOrder, pero eliminar campos con nombres de columnas del sheet para evitar conflictos
-        const { 'Info. Adicional Recojo': _, 'Info. Adicional Entrega': __, 'Tiempo de espera': ___, ...editingOrderClean } = editingOrder
-        const updatedOrder = {
-          ...editingOrderClean, // Copiar campos originales sin nombres de columnas del sheet
-          ...form,         // Sobrescribir con los campos editados del formulario
-          operador: operadorDefault, // IMPORTANTE: Siempre actualizar al operador actual
-          fecha: fechaNormalizada, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
-          id: editingOrder.id, // Asegurar que el ID no cambie
-          fecha_registro: editingOrder.fecha_registro, // Mantener fecha de registro original
-          hora_registro: editingOrder.hora_registro,    // Mantener hora de registro original
-          tiempo_espera: form.tiempo_espera || editingOrder.tiempo_espera || editingOrder['Tiempo de espera'] || editingOrder['Tiempo de Espera'] || '', // Asegurar que tiempo_espera esté presente
-          // Siempre usar el valor del formulario para info adicional (incluso si está vacío, para permitir borrarlo)
-          // Si el formulario tiene el campo (incluso si es string vacío), usarlo; sino usar el de editingOrder
-          info_direccion_recojo: form.info_direccion_recojo !== undefined && form.info_direccion_recojo !== null
-            ? String(form.info_direccion_recojo).trim()
-            : (editingOrder.info_direccion_recojo !== undefined && editingOrder.info_direccion_recojo !== null
-              ? String(editingOrder.info_direccion_recojo).trim()
-              : (editingOrder['Info. Adicional Recojo'] !== undefined && editingOrder['Info. Adicional Recojo'] !== null
-                ? String(editingOrder['Info. Adicional Recojo']).trim()
-                : '')),
-          info_direccion_entrega: form.info_direccion_entrega !== undefined && form.info_direccion_entrega !== null
-            ? String(form.info_direccion_entrega).trim()
-            : (editingOrder.info_direccion_entrega !== undefined && editingOrder.info_direccion_entrega !== null
-              ? String(editingOrder.info_direccion_entrega).trim()
-              : (editingOrder['Info. Adicional Entrega'] !== undefined && editingOrder['Info. Adicional Entrega'] !== null
-                ? String(editingOrder['Info. Adicional Entrega']).trim()
-                : ''))
-        }
-
-        // Actualizar en el sheet
-        await handleOrderEdit(updatedOrder)
-        
-        // Limpiar modo edición
-        setEditingOrder(null)
-        setForm({ ...initialOrder, operador: operadorDefault })
-        setPrecioEditadoManualmente(false)
-        setRecojoManual(false)
-        setEntregaManual(false)
-        setRecojoClienteAvisa(false)
-        setEntregaClienteAvisa(false)
-        
-        showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
-        
-        // Recargar pedidos desde el sheet para sincronizar
-        await loadOrdersFromSheet(true)
-        
-        // Cambiar a ver pedidos
-        setActiveTab('ver')
-        
-      } catch (err) {
-
-        showNotification('❌ Error al actualizar el pedido', 'error')
-      } finally {
-        setIsAddingOrder(false)
-      }
-      
-      return
-    }
-    
-    // MODO AGREGAR: Código original para crear nuevo pedido
-    
-    // Log: Intento de envío del formulario
-    await logToCSV('form_submit_attempt', { formData: form }, 'info')
-    
-    // Validar formulario
-      const validationErrors = validateFormWrapper()
+    // Validar formulario (mismo para crear y editar)
+    const validationErrors = validateFormWrapper()
     if (validationErrors.length > 0) {
-      // Log: Error de validación
-      await logToCSV('form_validation_error', { 
-        formData: form, 
-        errors: validationErrors 
-      }, 'error', `Validation failed: ${validationErrors.join(', ')}`)
-      
-      // Mostrar errores de validación
       const errorMessage = `Por favor, corrija los siguientes errores:\n\n${validationErrors.map(error => `• ${error}`).join('\n')}`
       showNotification(errorMessage, 'error')
-      
-      // Hacer scroll al primer campo con error
       const firstErrorField = document.querySelector('.field-required')
       if (firstErrorField) {
         firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' })
         firstErrorField.focus()
+      }
+      
+      // Log solo en modo crear
+      if (!editingOrder) {
+        await logToCSV('form_validation_error', { 
+          formData: form, 
+          errors: validationErrors 
+        }, 'error', `Validation failed: ${validationErrors.join(', ')}`)
       }
       return
     }
@@ -2833,115 +2746,135 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     // Activar estado de carga
     setIsAddingOrder(true)
     
-    // Mostrar notificación inmediatamente
-    showNotification('🔄 Agregando pedido...', 'info')
-    
-    // Usar función aislada para fechas y horas bolivianas
-    const { fechaRegistro, horaRegistro } = getBoliviaDateTime()
-    
-    // Generar ID consecutivo de forma segura
-    let nextId
     try {
-      nextId = await getNextId()
-
-    } catch (error) {
-
-      // Si falla, usar timestamp como ID único
-      nextId = Date.now()
-
-    }
-    
-    // Normalizar la fecha al formato estándar DD/MM/YYYY antes de crear el pedido
-    const fechaNormalizada = formatToStandardDate(form.fecha)
-    console.log(`📅 [Crear Pedido] Fecha normalizada: "${form.fecha}" -> "${fechaNormalizada}"`)
-    
-    const newOrder = { 
-      id: nextId.toString(), 
-      ...form,
-      fecha: fechaNormalizada, // IMPORTANTE: Usar fecha normalizada (DD/MM/YYYY)
-      operador: operadorDefault, // Asegurar que el operador se asigne correctamente
-      fecha_registro: fechaRegistro,
-      hora_registro: horaRegistro,
-      // Valores por defecto para estado y estado de pago
-      estado: form.estado || 'Pendiente',
-      estado_pago: form.estado_pago || 'Debe Cliente'
-    }
-    
-    // Log de debug para verificar que ambos campos se envíen correctamente
-
-    // NO agregar localmente aquí - esperar a que se guarde en el sheet
-    setForm({ ...initialOrder, operador: operadorDefault })
-    setPrecioEditadoManualmente(false)
-    // Resetear modos manuales
-    setRecojoManual(false)
-    setEntregaManual(false)
-    
-    try {
-      await saveToSheet(newOrder)
-      
-      // Si el pedido viene de un pedido cliente, actualizar su estado a "CREADO" y guardar el ID del pedido oficial
-      if (newOrder.desdePedidoCliente && newOrder.idPedidoCliente) {
+      if (editingOrder) {
+        // ============ MODO EDICIÓN ============
+        showNotification('🔄 Guardando cambios...', 'info')
+        
+        // Normalizar la fecha al formato estándar DD/MM/YYYY
+        const fechaNormalizada = formatToStandardDate(form.fecha)
+        
+        // Crear objeto actualizado manteniendo campos originales
+        const updatedOrder = {
+          ...form,
+          id: editingOrder.id,
+          fecha: fechaNormalizada,
+          operador: operadorDefault,
+          fecha_registro: editingOrder.fecha_registro,
+          hora_registro: editingOrder.hora_registro,
+          estado: form.estado || 'Pendiente',
+          estado_pago: form.estado_pago || 'Debe Cliente'
+        }
+        
+        // Actualizar en el sheet usando la función refactorizada
+        // Ahora updateOrderInSheet usa filterOrderForSheet internamente
+        await updateOrderInSheetAPI(updatedOrder)
+        
+        showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
+        
+        // Limpiar modo edición
+        setEditingOrder(null)
+        setActiveTab('ver')
+        
+      } else {
+        // ============ MODO CREAR ============
+        showNotification('🔄 Agregando pedido...', 'info')
+        
+        // Log: Intento de envío del formulario
+        await logToCSV('form_submit_attempt', { formData: form }, 'info')
+        
+        // Generar fecha, hora y ID para el nuevo pedido
+        const { fechaRegistro, horaRegistro } = getBoliviaDateTime()
+        
+        let nextId
         try {
-
-          const response = await fetch(`${getBackendUrl()}/api/cliente/actualizar-estado-pedido`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              idPedidoCliente: newOrder.idPedidoCliente,
-              idPedidoOficial: newOrder.id
+          nextId = await getNextId()
+        } catch (error) {
+          nextId = Date.now() // Fallback a timestamp
+        }
+        
+        // Normalizar la fecha al formato estándar DD/MM/YYYY
+        const fechaNormalizada = formatToStandardDate(form.fecha)
+        
+        const newOrder = { 
+          id: nextId.toString(), 
+          ...form,
+          fecha: fechaNormalizada,
+          operador: operadorDefault,
+          fecha_registro: fechaRegistro,
+          hora_registro: horaRegistro,
+          estado: form.estado || 'Pendiente',
+          estado_pago: form.estado_pago || 'Debe Cliente'
+        }
+        
+        // Guardar en el sheet
+        await saveToSheet(newOrder)
+        
+        // Si el pedido viene de un pedido cliente, actualizar su estado
+        if (newOrder.desdePedidoCliente && newOrder.idPedidoCliente) {
+          try {
+            const response = await fetch(`${getBackendUrl()}/api/cliente/actualizar-estado-pedido`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                idPedidoCliente: newOrder.idPedidoCliente,
+                idPedidoOficial: newOrder.id
+              })
             })
-          })
-          
-          if (response.ok) {
-            const result = await response.json()
-
-            toast.success(`✅ Pedido cliente #${newOrder.idPedidoCliente} marcado como CREADO → Pedido oficial #${newOrder.id}`, {
-              autoClose: 4000
-            })
-          } else {
-            const error = await response.json()
-
+            
+            if (response.ok) {
+              toast.success(`✅ Pedido cliente #${newOrder.idPedidoCliente} marcado como CREADO → Pedido oficial #${newOrder.id}`, {
+                autoClose: 4000
+              })
+            } else {
+              toast.warning('⚠️ Pedido creado pero no se pudo actualizar el estado del pedido cliente', {
+                autoClose: 4000
+              })
+            }
+          } catch (updateError) {
             toast.warning('⚠️ Pedido creado pero no se pudo actualizar el estado del pedido cliente', {
               autoClose: 4000
             })
           }
-        } catch (updateError) {
-
-          toast.warning('⚠️ Pedido creado pero no se pudo actualizar el estado del pedido cliente', {
-            autoClose: 4000
-          })
         }
+        
+        // Log: Pedido agregado exitosamente
+        await logToCSV('order_added_success', { 
+          orderData: newOrder,
+          orderId: newOrder.id 
+        }, 'success')
+        
+        // Mostrar modal de éxito
+        setLastAddedOrder(newOrder)
+        setShowSuccessModal(true)
       }
       
-      // Log: Pedido agregado exitosamente
-      await logToCSV('order_added_success', { 
-        orderData: newOrder,
-        orderId: newOrder.id 
-      }, 'success')
-      
-      // Mostrar modal de éxito con la información del pedido
-      setLastAddedOrder(newOrder)
-      setShowSuccessModal(true)
+      // Limpiar formulario y recargar (común para crear y editar)
+      setForm({ ...initialOrder, operador: operadorDefault })
+      setPrecioEditadoManualmente(false)
+      setRecojoManual(false)
+      setEntregaManual(false)
+      setRecojoClienteAvisa(false)
+      setEntregaClienteAvisa(false)
       
       // Recargar pedidos desde el sheet para sincronizar
       await loadOrdersFromSheet(true)
       
-      // NO cambiar de pestaña automáticamente - dejar que el usuario decida
-      
     } catch (err) {
-
-      // Log: Error al guardar en Google Sheet
-      await logToCSV('order_save_error', { 
-        orderData: newOrder,
-        orderId: newOrder.id,
-        error: err.message 
-      }, 'error', err)
+      console.error('Error en handleAdd:', err)
       
-      showNotification('⚠️ Pedido guardado localmente (error en Google Sheet)', 'warning')
+      if (editingOrder) {
+        showNotification(`❌ Error al actualizar el pedido: ${err.message}`, 'error')
+      } else {
+        // Log: Error al guardar en Google Sheet
+        await logToCSV('order_save_error', { 
+          formData: form,
+          error: err.message 
+        }, 'error', err)
+        
+        showNotification('⚠️ Error al guardar el pedido', 'error')
+      }
     } finally {
-      // Desactivar estado de carga
       setIsAddingOrder(false)
     }
   }
@@ -3067,17 +3000,22 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   const loadOrdersFromSheet = async (forceReload = false) => {
+    // Evitar múltiples llamadas simultáneas
     if (loading) {
-      return // Evitar múltiples llamadas simultáneas
+      console.log('⏸️ Ya hay una carga en progreso, esperando...')
+      return
     }
     
-    // Si ya hay datos cargados y no es una recarga forzada, no hacer nada
-    if (!forceReload && dataLoaded && orders.length > 0) {
+    // Guard simplificado: solo skip si forceReload=false Y ya hay datos cargados
+    // Removemos la condición de orders.length > 0 para permitir recargas cuando esté vacío
+    if (!forceReload && dataLoaded) {
+      console.log('✓ Datos ya cargados, usando caché')
       return
     }
     
     try {
       setLoading(true)
+      console.log('📡 Iniciando carga desde Google Sheets...')
       
       const data = await loadOrdersAPI()
 
@@ -3085,28 +3023,42 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         // Mapear los datos usando la función del servicio
         const imported = data.map((row, index) => mapRowToOrder(row, index, initialOrder, operadorDefault))
 
-      // Limpiar duplicados por ID (mantener solo el último)
-      const uniqueOrders = imported.reduce((acc, current) => {
-        const existingIndex = acc.findIndex(item => item.id === current.id)
-        if (existingIndex >= 0) {
-          acc[existingIndex] = current // Reemplazar con la versión más reciente
-        } else {
-          acc.push(current)
-        }
-        return acc
-      }, [])
-      
-      // Reemplazar completamente los pedidos
-      setOrders(uniqueOrders)
-      setDataLoaded(true)
+        // Limpiar duplicados por ID (mantener solo el último)
+        const uniqueOrders = imported.reduce((acc, current) => {
+          const existingIndex = acc.findIndex(item => item.id === current.id)
+          if (existingIndex >= 0) {
+            acc[existingIndex] = current // Reemplazar con la versión más reciente
+          } else {
+            acc.push(current)
+          }
+          return acc
+        }, [])
+        
+        // Reemplazar completamente los pedidos
+        setOrders(uniqueOrders)
+        setDataLoaded(true)
         showNotification(`✅ ${uniqueOrders.length} pedidos cargados desde Google Sheets API`, 'success')
+        console.log(`✅ Carga exitosa: ${uniqueOrders.length} pedidos`)
       } else {
         showNotification('📋 No hay pedidos en el sheet', 'info')
         setOrders([])
         setDataLoaded(true)
+        console.log('📋 Sheet vacío o sin datos')
       }
     } catch (err) {
-      showNotification('❌ Error al cargar pedidos desde Google Sheet', 'error')
+      console.error('❌ Error al cargar pedidos:', err)
+      
+      // Si es error de conexión (503), marcar y evitar reintentos constantes
+      if (err.code === 'NO_CONNECTION' || err.status === 503 || err.message?.includes('conexión')) {
+        setConnectionError(true)
+        setLastConnectionErrorTime(Date.now())
+        showNotification('⚠️ Sin conexión a internet. No se pueden cargar pedidos.', 'warning')
+        // Marcar como cargado (aunque vacío) para evitar reintentos constantes
+        setDataLoaded(true)
+      } else {
+        showNotification('❌ Error al cargar pedidos desde Google Sheet', 'error')
+        // No setear dataLoaded=true en caso de otros errores, para que pueda reintentar
+      }
     } finally {
       setLoading(false)
     }
@@ -3186,12 +3138,17 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   // Función para manejar "Ver pedidos" desde el modal
   const handleViewOrders = () => {
-
+    console.log('📋 [handleViewOrders] Cambiando a vista de pedidos')
+    
     // Configurar filtro de fecha para el pedido agregado
     if (lastAddedOrder && lastAddedOrder.fecha) {
-      const orderDate = new Date(lastAddedOrder.fecha).toISOString().split('T')[0]
-
-      setDateFilter(orderDate)
+      // Convertir fecha de DD/MM/YYYY a formato ISO (YYYY-MM-DD)
+      const orderDate = convertToISO(lastAddedOrder.fecha)
+      console.log(`📅 [handleViewOrders] Fecha del pedido: "${lastAddedOrder.fecha}" -> ISO: "${orderDate}"`)
+      
+      if (orderDate) {
+        setDateFilter(orderDate)
+      }
     }
     
     // Cerrar modal y cambiar al Kanban
@@ -3590,36 +3547,36 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           cursor: 'not-allowed'
                         }}
                       />
-                  </div>
-                  <div className="form-group">
-                    <label style={{marginBottom: '4px', display: 'block', fontWeight: '600'}}>Operador</label>
-                    <input
-                      type="text"
-                      name="operador"
+                    </div>
+                    <div className="form-group">
+                      <label style={{marginBottom: '4px', display: 'block', fontWeight: '600'}}>Operador</label>
+                      <input
+                        type="text"
+                        name="operador"
                       value={editingOrder ? operadorDefault : (form.operador || '')}
                       onChange={editingOrder ? null : handleChange}
-                      placeholder="Operador"
+                        placeholder="Operador"
                       readOnly={!!editingOrder}
                       disabled={!!editingOrder}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px',
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
                         fontSize: '14px',
                         backgroundColor: editingOrder ? '#e9ecef' : 'white',
                         color: editingOrder ? '#495057' : 'inherit',
                         cursor: editingOrder ? 'not-allowed' : 'text'
-                      }}
+                        }}
                       title={editingOrder ? `Se actualizará automáticamente a: ${operadorDefault}` : ''}
-                    />
+                      />
                     {editingOrder && (
                       <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                         ℹ️ El operador se actualizará automáticamente al usuario actual ({operadorDefault})
                       </small>
                     )}
+                    </div>
                   </div>
-                </div>
                 </div>
               )}
               
@@ -4146,8 +4103,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                   )}
                 </div>
                 
-                {/* Transporte y Método de Pago */}
-                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                {/* Transporte, Método de Pago, Distancia y Precio - Todos en una línea */}
+                <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  {/* Medio de Transporte */}
                   <div className="form-group">
                     <label style={{marginBottom: '4px', display: 'block'}}>Medio de Transporte <span className="required">*</span></label>
                     <SearchableSelect
@@ -4155,38 +4113,31 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       options={MEDIOS_TRANSPORTE}
                       value={form.medio_transporte} 
                       onChange={handleChange}
-                      placeholder="Seleccionar Medio de Transporte"
+                      placeholder="Seleccionar"
                       searchPlaceholder="Buscar medio de transporte..."
                       className={!form.medio_transporte ? 'field-required' : ''}
                       required
                     />
                   </div>
-                  <div className="form-group" style={{marginTop: '0px'}}>
+                  
+                  {/* Método de Pago */}
+                  <div className="form-group">
                     <label style={{marginBottom: '4px', display: 'block'}}>Método de Pago <span className="required">*</span></label>
                     <SearchableSelect
                       name="metodo_pago" 
                       options={METODOS_PAGO}
                       value={form.metodo_pago} 
                       onChange={handleChange}
-                      placeholder="Seleccionar Método de Pago"
+                      placeholder="Seleccionar"
                       searchPlaceholder="Buscar método de pago..."
                       className={!form.metodo_pago ? 'field-required' : ''}
                       required
                     />
                   </div>
-                </div>
-                
-                {/* Distancia y Precio */}
-                <div className="form-row" style={{display: 'flex', gap: '12px', marginBottom: '0'}}>
-                  <div className="form-group" style={{flex: 1}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px'}}>
-                      <label style={{display: 'block', margin: 0}}>Distancia (Km)</label>
-                      {form.distancia_km && form.distancia_km.trim() !== '' && (
-                        <span style={{fontSize: '12px', color: '#6c757d', fontStyle: 'italic'}}>
-                          Valor actual: {form.distancia_km} km
-                        </span>
-                      )}
-                    </div>
+                  
+                  {/* Distancia */}
+                  <div className="form-group">
+                    <label style={{marginBottom: '4px', display: 'block'}}>Distancia (Km)</label>
                     <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                       <input 
                         name="distancia_km" 
@@ -4195,9 +4146,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         min="0"
                         value={isCalculatingDistance ? '' : (form.distancia_km || '')} 
                         onChange={handleChange}
-                        placeholder={form.direccion_recojo && form.direccion_entrega ? 
-                          'Ingresa distancia o haz clic en 🔄' : 
-                          'Selecciona puntos de recojo y entrega'}
+                        placeholder="Distancia"
                         style={{
                           flex: 1,
                           padding: '12px 12px',
@@ -4235,7 +4184,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       )}
                     </div>
                   </div>
-                  <div className="form-group" style={{flex: 1, marginTop: '-2px'}}>
+                  
+                  {/* Precio Total */}
+                  <div className="form-group">
                     <label style={{marginBottom: '4px', display: 'block'}}>Precio Total (Bs)</label>
                     <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
                       <input 
@@ -4273,11 +4224,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         </button>
                       )}
                     </div>
-                    {form.metodo_pago === 'Cuenta' && (
-                      <small style={{color: '#28a745', fontSize: '0.8em'}}>
-                        💳 Precio calculado para el sheet (no se muestra en WhatsApp) - Puedes editarlo manualmente
-                      </small>
-                    )}
                   </div>
                 </div>
               </div>

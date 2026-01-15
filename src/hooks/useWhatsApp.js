@@ -19,6 +19,7 @@ export function useWhatsApp(form) {
       setWhatsappMessage(newMessage)
     }
   }, [
+    form.id, // Agregar ID para actualizar cuando se cree el pedido
     form.cliente, 
     form.recojo, 
     form.entrega, 

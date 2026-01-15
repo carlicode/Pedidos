@@ -9,10 +9,13 @@
  * @returns {number} Precio base en Bs
  */
 const calculateBicicletaPrice = (dist) => {
-  if (dist <= 1) return 8
+  // Redondear hacia arriba (si es 3.74 km, cobrar 4 km)
+  const distRedondeada = Math.ceil(dist)
+  
+  if (distRedondeada <= 1) return 8
   
   // Después del primer km: precio base 8 Bs + 2.5 Bs por cada km adicional
-  const kmAdicionales = dist - 1
+  const kmAdicionales = distRedondeada - 1
   return 8 + (kmAdicionales * 2.5)
 }
 
@@ -22,10 +25,13 @@ const calculateBicicletaPrice = (dist) => {
  * @returns {number} Precio base en Bs
  */
 const calculateBeezeroPrice = (dist) => {
-  if (dist <= 1) return 10
+  // Redondear hacia arriba (si es 3.74 km, cobrar 4 km)
+  const distRedondeada = Math.ceil(dist)
+  
+  if (distRedondeada <= 1) return 10
   
   // Después del primer km: precio base 10 Bs + 3 Bs por cada km adicional
-  const kmAdicionales = dist - 1
+  const kmAdicionales = distRedondeada - 1
   return 10 + (kmAdicionales * 3)
 }
 

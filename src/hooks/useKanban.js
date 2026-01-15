@@ -28,34 +28,39 @@ export function useKanban(orders, setOrders, logToCSV, showNotification, setMiss
 
   /**
    * Maneja cambios de estado con información adicional
+   * ACTUALIZADO: Ahora usa el endpoint unificado PUT /api/orders/:id
    */
   const handleStatusChange = async (orderId, newEstado, additionalData = {}) => {
     try {
+      // Obtener el pedido actual completo
+      const currentOrder = orders.find(o => o.id === orderId)
+      if (!currentOrder) {
+        throw new Error(`Pedido #${orderId} no encontrado`)
+      }
+      
+      // Crear objeto actualizado con el nuevo estado y datos adicionales
+      const updatedOrder = {
+        ...currentOrder,
+        estado: newEstado,
+        ...additionalData
+      }
+      
       // Actualizar estado localmente primero
       setOrders(prevOrders => 
         prevOrders.map(order => 
-          order.id === orderId 
-            ? { 
-                ...order, 
-                estado: newEstado,
-                ...additionalData // Incluir datos adicionales como hora_fin, observaciones, etc.
-              }
-            : order
+          order.id === orderId ? updatedOrder : order
         )
       )
       
-      // Actualizar en Google Sheet
+      // Actualizar en Google Sheet usando el endpoint unificado
+      // Este endpoint usa internamente filterOrderForSheet para garantizar consistencia
       try {
-        const response = await fetch('/api/update-order-status', {
+        const response = await fetch(`/api/orders/${orderId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            orderId: orderId,
-            newStatus: newEstado,
-            additionalData: additionalData
-          })
+          body: JSON.stringify(updatedOrder)
         })
         
         if (response.ok) {
@@ -72,7 +77,7 @@ export function useKanban(orders, setOrders, logToCSV, showNotification, setMiss
       // Log del cambio de estado
       await logToCSV('order_status_change', { 
         orderId: orderId,
-        oldStatus: orders.find(o => o.id === orderId)?.estado,
+        oldStatus: currentOrder.estado,
         newStatus: newEstado,
         additionalData: additionalData
       }, 'info')

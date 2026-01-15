@@ -175,6 +175,10 @@ if (!envLoaded) {
 const PORT = process.env.PORT || 5055
 const SHEET_ID = process.env.SHEET_ID || '1a8M19WHhfM2SWKSiWbTIpVU76gdAFCJ9uv7y0fnPA4g'
 const SHEET_NAME = process.env.SHEET_NAME || 'Registros'
+
+// Throttling para logs de error de conexión (evitar spam)
+let lastConnectionErrorLog = 0
+const CONNECTION_ERROR_LOG_INTERVAL = 60000 // 1 minuto
 const HORARIOS_SHEET_ID = process.env.HORARIOS_SHEET_ID || '' // ID del Sheet "Horarios Beezy" en Drive (Drivers)
 const HORARIOS_SHEET_NAME = process.env.HORARIOS_SHEET_NAME || 'Horarios Beezy'
 const HORARIOS_DRIVE_FOLDER_ID = '1EcBvakGg0MsQgq5XXKxUJDGdQU7yR4Pb' // Carpeta compartida en Drive
@@ -398,7 +402,6 @@ function buildRow(order) {
     }
     
     row[i] = value
-    console.log(`  ${columnName} (posición ${i}): "${value}"`)
     
     // Log especial para Hora Registro
     if (columnName === 'Hora Registro') {
@@ -521,7 +524,12 @@ const getShortestDrivingRoute = async ({ origin, destination, apiKey, context = 
       }
     } catch (error) {
       if (error.name !== 'AbortError') {
-        console.log(`⚠️ [${context}] Error consultando Directions API:`, error.message)
+        // Si es error de conexión, loguear pero continuar con Distance Matrix
+        if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+          console.log(`⚠️ [${context}] Sin conexión a internet. Intentando Distance Matrix...`)
+        } else {
+          console.log(`⚠️ [${context}] Error consultando Directions API:`, error.message)
+        }
       }
     }
   }
@@ -532,8 +540,19 @@ const getShortestDrivingRoute = async ({ origin, destination, apiKey, context = 
   console.log(`🔍 [${context}] Origin procesado: "${origin}" (encoded: "${encodedOrigin}")`)
   console.log(`🔍 [${context}] Destination procesado: "${destination}" (encoded: "${encodedDestination}")`)
   
-  const dmResponse = await fetch(distanceMatrixUrl)
-  const dmData = await dmResponse.json()
+  let dmResponse, dmData;
+  try {
+    dmResponse = await fetch(distanceMatrixUrl)
+    dmData = await dmResponse.json()
+  } catch (fetchError) {
+    // Si es error de conexión, lanzar error controlado
+    if (fetchError.code === 'ENOTFOUND' || fetchError.code === 'ECONNREFUSED' || fetchError.code === 'ETIMEDOUT') {
+      const error = new Error('Sin conexión a internet. No se puede calcular la distancia.')
+      error.code = 'NO_CONNECTION'
+      throw error
+    }
+    throw fetchError
+  }
 
   // Log detallado de la respuesta
   console.log(`📊 [${context}] Distance Matrix respuesta:`, {
@@ -1286,12 +1305,30 @@ app.get('/api/distance-proxy', async (req, res) => {
       destinationsLength: processedDestinations?.length
     })
     
-    const routeInfo = await getShortestDrivingRoute({
-      origin: processedOrigins,
-      destination: processedDestinations,
-      apiKey,
-      context: 'distance-proxy'
-    })
+    let routeInfo;
+    try {
+      routeInfo = await getShortestDrivingRoute({
+        origin: processedOrigins,
+        destination: processedDestinations,
+        apiKey,
+        context: 'distance-proxy'
+      })
+    } catch (routeError) {
+      // Si es error de conexión, retornar error controlado
+      if (routeError.code === 'NO_CONNECTION' || routeError.code === 'ENOTFOUND' || routeError.code === 'ECONNREFUSED' || routeError.code === 'ETIMEDOUT') {
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a internet. No se puede calcular la distancia.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Maps API. Verifica tu conexión a internet.',
+          status: 'NO_CONNECTION'
+        })
+      }
+      throw routeError
+    }
     
     console.log(`🚗 Ruta seleccionada (${routeInfo.source}): ${routeInfo.distanceText} - ${routeInfo.durationText}`)
     
@@ -1329,8 +1366,22 @@ app.get('/api/distance-proxy', async (req, res) => {
     
     res.json(responsePayload)
   } catch (error) {
-    console.error('❌ Error en distance proxy:', error)
-    res.status(500).json({ error: 'Error calculando distancia: ' + error.message })
+    // Si es un error de conectividad, retornar error controlado
+    if (error.code === 'NO_CONNECTION' || error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      const now = Date.now()
+      if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+        console.warn('⚠️ Error de conectividad en distance proxy.')
+        lastConnectionErrorLog = now
+      }
+      return res.status(503).json({ 
+        error: 'Sin conexión a internet',
+        message: 'No se puede conectar a Google Maps API. Verifica tu conexión a internet.',
+        status: 'NO_CONNECTION'
+      })
+    }
+    
+    console.error('❌ Error en distance proxy:', error.message || error)
+    res.status(500).json({ error: 'Error calculando distancia: ' + (error.message || error) })
   }
 })
 
@@ -1379,7 +1430,6 @@ app.post('/api/orders', async (req, res) => {
     // Verificar si el ID ya existe y contar duplicados
     for (let i = 1; i < ids.length; i++) { // Saltar header (i=0)
       const sheetId = ids[i] && ids[i][0]
-      console.log(`🔍 Comparando: "${sheetId}" (${typeof sheetId}) === "${order.id}" (${typeof order.id})`)
       
       if (ids[i] && String(sheetId) === String(order.id)) {
         if (existingRowIndex === -1) {
@@ -1416,15 +1466,17 @@ app.post('/api/orders', async (req, res) => {
 
     if (existingRowIndex > 0) {
       // Actualizar fila existente
+      // HEADER_ORDER tiene 31 columnas (A hasta AE)
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
-        range: `${quoted}!A${existingRowIndex}:AD${existingRowIndex}`,
+        range: `${quoted}!A${existingRowIndex}:AE${existingRowIndex}`,
         valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
         requestBody: { values: [row] }
       })
       console.log(`Updated existing order #${order.id} at row ${existingRowIndex}`)
     } else {
       // Agregar nueva fila
+      // HEADER_ORDER tiene 31 columnas (A hasta AE)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
         range: `${quoted}!A:AE`,
@@ -1440,6 +1492,132 @@ app.post('/api/orders', async (req, res) => {
     console.error('❌ Error en /api/orders:', err)
     console.error('❌ Stack trace:', err.stack)
     res.status(500).json({ ok: false, error: String(err) })
+  }
+})
+
+/**
+ * PUT /api/orders/:id
+ * Endpoint unificado para actualizar pedidos
+ * Usa el mismo formato y lógica que POST /api/orders para garantizar consistencia
+ * IMPORTANTE: Este endpoint reemplaza a PUT /api/update-order-status
+ */
+app.put('/api/orders/:id', async (req, res) => {
+  try {
+    const orderId = req.params.id
+    const order = req.body || {}
+    
+    if (!orderId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'ID de pedido es requerido' 
+      })
+    }
+    
+    if (!SHEET_ID) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'SHEET_ID no configurado' 
+      })
+    }
+    
+    let auth;
+    try {
+      auth = await getAuthClient()
+      await auth.authorize()
+    } catch (authError) {
+      if (authError.code === 'ENOTFOUND' || authError.code === 'ECONNREFUSED' || authError.code === 'ETIMEDOUT') {
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a internet. No se puede actualizar el pedido.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          success: false,
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.'
+        })
+      }
+      throw authError
+    }
+    
+    const sheets = google.sheets({ version: 'v4', auth })
+    const quoted = quoteSheet(SHEET_NAME)
+    
+    // Buscar el pedido por ID
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${quoted}!A:A`
+    })
+    
+    const ids = response.data.values || []
+    let rowIndex = -1
+    
+    // Buscar la fila que contiene el pedido
+    for (let i = 1; i < ids.length; i++) { // Saltar header (i=0)
+      const sheetId = ids[i] && ids[i][0]
+      if (String(sheetId) === String(orderId)) {
+        rowIndex = i + 1 // +1 porque las filas de Google Sheets empiezan en 1
+        console.log(`✅ Encontrado pedido #${orderId} en fila ${rowIndex}`)
+        break
+      }
+    }
+    
+    if (rowIndex === -1) {
+      return res.status(404).json({ 
+        success: false,
+        error: `Pedido #${orderId} no encontrado` 
+      })
+    }
+    
+    // Usar la MISMA función buildRow que POST para garantizar consistencia
+    const row = buildRow(order)
+    
+    // HEADER_ORDER tiene 31 columnas (A hasta AE)
+    // Asegurar que el rango coincida exactamente con el número de columnas
+    // AE es la columna 31 (A=1, B=2, ..., Z=26, AA=27, AB=28, AC=29, AD=30, AE=31)
+    const lastColumn = 'AE'
+    
+    // Verificar que el row tenga exactamente 31 elementos
+    if (row.length !== HEADER_ORDER.length) {
+      console.warn(`⚠️ Advertencia: row.length (${row.length}) no coincide con HEADER_ORDER.length (${HEADER_ORDER.length})`)
+    }
+    
+    // Actualizar la fila en el sheet
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${quoted}!A${rowIndex}:${lastColumn}${rowIndex}`,
+      valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
+      requestBody: { values: [row] }
+    })
+    
+    console.log(`✅ Pedido #${orderId} actualizado exitosamente en fila ${rowIndex}`)
+    
+    res.json({ 
+      success: true, 
+      message: `Pedido #${orderId} actualizado exitosamente`,
+      rowIndex
+    })
+    
+  } catch (error) {
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      const now = Date.now()
+      if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+        console.warn('⚠️ Error de conectividad actualizando pedido.')
+        lastConnectionErrorLog = now
+      }
+      return res.status(503).json({ 
+        success: false,
+        error: 'Sin conexión a internet',
+        message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.'
+      })
+    }
+    
+    console.error(`❌ Error actualizando pedido #${req.params.id}:`, error.message || error)
+    res.status(500).json({ 
+      success: false,
+      error: 'Error actualizando pedido', 
+      details: error.message
+    })
   }
 })
 
@@ -1664,8 +1842,29 @@ app.get('/api/read-orders', async (req, res) => {
       return res.status(400).json({ error: 'SHEET_ID no configurado' })
     }
     
-    const auth = await getAuthClient()
-    await auth.authorize()
+    let auth;
+    try {
+      auth = await getAuthClient()
+      await auth.authorize()
+    } catch (authError) {
+      // Si hay problemas de conectividad (DNS, red, etc.), retornar error controlado
+      if (authError.code === 'ENOTFOUND' || authError.code === 'ECONNREFUSED' || authError.code === 'ETIMEDOUT') {
+        // Solo loguear una vez por minuto para evitar spam
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a internet. No se pueden cargar pedidos desde Google Sheets.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+          data: [],
+          count: 0
+        })
+      }
+      throw authError
+    }
+    
     const sheets = google.sheets({ version: 'v4', auth })
     const quoted = quoteSheet(SHEET_NAME)
     
@@ -1673,10 +1872,30 @@ app.get('/api/read-orders', async (req, res) => {
     const range = `${quoted}!A:AE`  // Leer todas las columnas hasta AE
     console.log('📊 Leyendo rango:', range)
     
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: range
-    })
+    let response;
+    try {
+      response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: range
+      })
+    } catch (sheetError) {
+      // Si hay problemas de conectividad al leer el sheet, retornar error controlado
+      if (sheetError.code === 'ENOTFOUND' || sheetError.code === 'ECONNREFUSED' || sheetError.code === 'ETIMEDOUT') {
+        // Solo loguear una vez por minuto para evitar spam
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a Google Sheets. Retornando error controlado.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+          data: [],
+          count: 0
+        })
+      }
+      throw sheetError
+    }
     
     const rows = response.data.values || []
     console.log('📋 Filas obtenidas:', rows.length)
@@ -1721,16 +1940,41 @@ app.get('/api/read-orders', async (req, res) => {
     })
     
   } catch (error) {
-    console.error('❌ Error leyendo datos del Google Sheet:', error)
+    // Si es un error de conectividad, retornar error controlado
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      // Solo loguear una vez por minuto para evitar spam
+      const now = Date.now()
+      if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+        console.warn('⚠️ Error de conectividad leyendo datos del Google Sheet.')
+        lastConnectionErrorLog = now
+      }
+      return res.status(503).json({ 
+        error: 'Sin conexión a internet',
+        message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+        data: [],
+        count: 0
+      })
+    }
+    
+    console.error('❌ Error leyendo datos del Google Sheet:', error.message || error)
     res.status(500).json({ 
       error: 'Error leyendo datos del Google Sheet', 
-      details: error.message 
+      details: error.message,
+      data: [],
+      count: 0
     })
   }
 })
 
 // Endpoint para actualizar el estado de un pedido
+/**
+ * DEPRECATED: Este endpoint se mantiene por compatibilidad pero ya no debería usarse
+ * Usar PUT /api/orders/:id en su lugar
+ * TODO: Eliminar después de verificar que no hay código que lo use
+ */
 app.put('/api/update-order-status', async (req, res) => {
+  console.warn('⚠️ DEPRECATED: /api/update-order-status - Usar PUT /api/orders/:id en su lugar')
+  
   try {
     const { orderId, newStatus, additionalData = {} } = req.body
     
@@ -1747,16 +1991,53 @@ app.put('/api/update-order-status', async (req, res) => {
       return res.status(400).json({ error: 'SHEET_ID no configurado' })
     }
     
-    const auth = await getAuthClient()
-    await auth.authorize()
+    let auth;
+    try {
+      auth = await getAuthClient()
+      await auth.authorize()
+    } catch (authError) {
+      // Si hay problemas de conectividad, retornar error controlado
+      if (authError.code === 'ENOTFOUND' || authError.code === 'ECONNREFUSED' || authError.code === 'ETIMEDOUT') {
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a internet. No se puede actualizar el pedido.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+          success: false
+        })
+      }
+      throw authError
+    }
+    
     const sheets = google.sheets({ version: 'v4', auth })
     const quoted = quoteSheet(SHEET_NAME)
     
     // Leer el Google Sheet - leer más columnas para incluir "Tiempo de espera"
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${quoted}!A:AE`, // Todas las columnas hasta AE (31 columnas)
-    })
+    let response;
+    try {
+      response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: `${quoted}!A:AE`, // Todas las columnas hasta AE (31 columnas)
+      })
+    } catch (sheetError) {
+      // Si hay problemas de conectividad al leer el sheet, retornar error controlado
+      if (sheetError.code === 'ENOTFOUND' || sheetError.code === 'ECONNREFUSED' || sheetError.code === 'ETIMEDOUT') {
+        const now = Date.now()
+        if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+          console.warn('⚠️ Sin conexión a Google Sheets. No se puede actualizar el pedido.')
+          lastConnectionErrorLog = now
+        }
+        return res.status(503).json({ 
+          error: 'Sin conexión a internet',
+          message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+          success: false
+        })
+      }
+      throw sheetError
+    }
     
     const rows = response.data.values || []
     if (rows.length === 0) {
@@ -1820,11 +2101,11 @@ app.put('/api/update-order-status', async (req, res) => {
     
     // Actualizar cada campo que esté presente en additionalData
     console.log('🔍 Headers disponibles en el sheet:', headers.map((h, i) => `${i}: "${h || '(vacío)'}"`).join(', '))
-    console.log('🔍 Buscando tiempo_espera en additionalData:', additionalData.tiempo_espera)
+    console.log('🔍 Datos en additionalData:', Object.keys(additionalData).map(k => `${k}: ${additionalData[k]}`).join(', '))
     
     for (const [fieldName, columnName] of Object.entries(fieldMapping)) {
-      // Campos que siempre deben actualizarse, incluso si están vacíos (para permitir borrarlos)
-      const alwaysUpdateFields = ['info_direccion_recojo', 'info_direccion_entrega']
+      // Campos que siempre deben actualizarse, incluso si están vacíos (para permitir borrarlos o actualizarlos)
+      const alwaysUpdateFields = ['info_direccion_recojo', 'info_direccion_entrega', 'tiempo_espera', 'observaciones', 'descripcion_cobro_pago']
       const shouldUpdate = alwaysUpdateFields.includes(fieldName) 
         ? (additionalData[fieldName] !== undefined && additionalData[fieldName] !== null)
         : (additionalData[fieldName] !== undefined && additionalData[fieldName] !== null && additionalData[fieldName] !== '')
@@ -1866,20 +2147,19 @@ app.put('/api/update-order-status', async (req, res) => {
           console.log(`✅ Actualizado ${columnName} (columna ${columnIndex}, header: "${headers[columnIndex]}"): ${valueToSet}`)
         } else {
           console.log(`⚠️ Columna "${columnName}" no encontrada en el sheet`)
-          // Buscar columnas similares para tiempo_espera
-          if (fieldName === 'tiempo_espera') {
-            const similarHeaders = headers.map((h, i) => ({ index: i, name: h })).filter(({ name }) => 
-              name && (name.toLowerCase().includes('tiempo') || name.toLowerCase().includes('espera'))
-            )
-            if (similarHeaders.length > 0) {
-              console.log(`   Columnas similares encontradas:`, similarHeaders)
-            } else {
-              console.log(`   ⚠️ No se encontró ninguna columna relacionada con "tiempo" o "espera"`)
-            }
+          // Buscar columnas similares
+          const similarHeaders = headers.map((h, i) => ({ index: i, name: h })).filter(({ name }) => 
+            name && name.toLowerCase().includes(columnName.split(' ')[0].toLowerCase())
+          )
+          if (similarHeaders.length > 0) {
+            console.log(`   Columnas similares encontradas:`, similarHeaders)
           }
         }
-      } else if (fieldName === 'tiempo_espera') {
-        console.log(`⚠️ tiempo_espera está undefined, null o vacío en additionalData. Valor:`, additionalData.tiempo_espera)
+      } else {
+        // Log detallado solo para campos que no se actualizan
+        if (['tiempo_espera', 'observaciones'].includes(fieldName)) {
+          console.log(`   ℹ️ Campo ${fieldName} no se actualiza. Valor: "${additionalData[fieldName]}" (está en alwaysUpdateFields pero es ${additionalData[fieldName] === undefined ? 'undefined' : additionalData[fieldName] === null ? 'null' : 'vacío/presente'})`)
+        }
       }
     }
     
@@ -1914,10 +2194,25 @@ app.put('/api/update-order-status', async (req, res) => {
     })
     
   } catch (error) {
-    console.error('❌ Error actualizando estado del pedido:', error)
+    // Si es un error de conectividad, retornar error controlado
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      const now = Date.now()
+      if (now - lastConnectionErrorLog > CONNECTION_ERROR_LOG_INTERVAL) {
+        console.warn('⚠️ Error de conectividad actualizando estado del pedido.')
+        lastConnectionErrorLog = now
+      }
+      return res.status(503).json({ 
+        error: 'Sin conexión a internet',
+        message: 'No se puede conectar a Google Sheets. Verifica tu conexión a internet.',
+        success: false
+      })
+    }
+    
+    console.error('❌ Error actualizando estado del pedido:', error.message || error)
     res.status(500).json({ 
       error: 'Error actualizando estado del pedido', 
-      details: error.message 
+      details: error.message,
+      success: false
     })
   }
 })
