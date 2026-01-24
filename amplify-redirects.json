@@ -1,0 +1,8 @@
+[
+  {
+    "source": "/api/<*>",
+    "target": "http://pedidos-backend-prod.eba-c22x9qsa.us-east-1.elasticbeanstalk.com/api/<*>",
+    "status": "200",
+    "condition": null
+  }
+]

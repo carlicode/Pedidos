@@ -1,306 +1,358 @@
-# 🚀 Pedidos - Sistema de Gestión de Pedidos
+# Sistema de Pedidos - EcoDelivery
 
-Sistema completo de gestión de pedidos con integración a Google Sheets, cálculo de distancias con Google Maps, y autenticación segura.
+Sistema completo de gestión de pedidos con integración a Google Sheets y DynamoDB.
 
-## 🌟 Características
-
-- ✅ Gestión completa de pedidos (Agregar, Editar, Cancelar, Entregar)
-- ✅ Integración con Google Sheets para almacenamiento
-- ✅ Cálculo automático de distancias y precios
-- ✅ Validación de direcciones con Google Maps
-- ✅ Sistema de notas del equipo
-- ✅ Gestión de inventarios
-- ✅ Horarios de bikers
-- ✅ Dashboard con kanban
-- ✅ Autenticación JWT segura
-- ✅ Logs profesionales con Winston
-
-## 🏗️ Stack Tecnológico
+## 🚀 Stack Tecnológico
 
 ### Frontend
-- React 18
-- Vite
-- React Router
-- Lucide React (iconos)
-- HTML2Canvas + jsPDF (reportes)
+- **React** + Vite
+- **React Router** para navegación
+- **Google Sheets API** para datos
 
 ### Backend
-- Node.js + Express
-  - Google Sheets API
-- Google Maps API (Distance Matrix, Geocoding)
-- AWS DynamoDB (usuarios)
-- AWS Secrets Manager (credenciales)
-- Winston (logging)
+- **Node.js** + Express
+- **AWS DynamoDB** para usuarios
+- **AWS Secrets Manager** para credenciales
+- **Google Sheets API** para integración
 
-## 📦 Instalación Local
+### Infraestructura AWS
+- **AWS Amplify** para hosting del frontend
+- **Elastic Beanstalk** para el backend API
+- **DynamoDB** para base de datos
+- **Secrets Manager** para credenciales seguras
+- **CloudWatch** para logs y monitoreo
 
-### Prerrequisitos
+## 💻 Desarrollo Local
 
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-- AWS CLI configurado
-- Cuenta de AWS con acceso a DynamoDB y Secrets Manager
+### Requisitos
+
+- Node.js >= 18
+- npm >= 9
+- AWS CLI configurado (para deployment)
+- Google Service Account credentials
 
 ### Setup
 
-```bash
-# 1. Clonar repositorio
-git clone <tu-repo>
-cd Pedidos
+1. **Instalar dependencias:**
+   ```bash
+   npm run install:all
+   # O manualmente:
+   # npm install && cd frontend && npm install && cd ../backend && npm install && cd ..
+   ```
 
-# 2. Instalar dependencias del frontend
-npm install
+2. **Configurar variables de entorno:**
+   
+   **Backend:**
+   ```bash
+   cp backend/env.example backend/.env
+   # Editar backend/.env con tus credenciales
+   ```
+   
+   **Frontend:**
+   ```bash
+   # Crear frontend/.env para desarrollo local
+   echo "VITE_API_URL=http://localhost:5055" > frontend/.env
+   ```
 
-# 3. Instalar dependencias del backend
-cd server
-npm install
-cd ..
+3. **Iniciar desarrollo:**
 
-# 4. Configurar variables de entorno
-cp server/env.example server/.env
-# Editar server/.env con tus valores
+   **Opción A - Ambos servicios:**
+   ```bash
+   npm run dev
+   ```
 
-# 5. Verificar que los secretos de AWS están configurados
-node server/scripts/verify-secrets.mjs
-```
+   **Opción B - Separados:**
+   
+   **Terminal 1 - Backend:**
+   ```bash
+   cd backend
+   npm run dev
+   ```
 
-## 🚀 Ejecución Local
+   **Terminal 2 - Frontend:**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
 
-### Opción 1: Todo junto
-```bash
-npm run dev:all
-```
-
-### Opción 2: Separado
-
-Terminal 1 - Backend:
-```bash
-npm run server
-```
-
-Terminal 2 - Frontend:
-```bash
-npm run dev
-```
-
-## 🌐 Deploy a AWS Amplify
-
-### ⚡ Quick Start
-
-```bash
-# 1. Commitear cambios
-git add .
-git commit -m "feat: Deploy a producción"
-git push origin master
-
-# 2. Verificar configuración
-./server/scripts/pre-deploy-check.sh
-
-# 3. Seguir la guía de deploy
-```
-
-### 📚 Documentación de Deploy
-
-- **[SETUP_COMPLETO.md](./SETUP_COMPLETO.md)** - Resumen ejecutivo completo ⭐
-- **[DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md)** - Guía paso a paso detallada
-- **[DEPLOY_AWS.md](./DEPLOY_AWS.md)** - Documentación técnica completa
-
-### 🔐 Seguridad
-
-Todas las credenciales están protegidas:
-- ✅ Google Maps API Key → AWS Secrets Manager
-- ✅ Google Service Account → AWS Secrets Manager
-- ✅ Sheet IDs → AWS Secrets Manager
-- ✅ JWT Secret → AWS Secrets Manager
-- ✅ Archivos sensibles en .gitignore
-
-## 🛠️ Scripts Disponibles
-
-### Frontend
-```bash
-npm run dev          # Desarrollo
-npm run build        # Build producción
-npm run preview      # Preview del build
-```
-
-### Backend
-```bash
-npm run server       # Iniciar servidor
-cd server && npm run dev  # Con nodemon
-```
-
-### Deploy
-```bash
-# Verificar secretos en AWS
-node server/scripts/verify-secrets.mjs
-
-# Migrar secretos a AWS
-node server/scripts/migrate-secrets-to-aws.mjs
-
-# Configurar permisos IAM
-./server/scripts/setup-iam-permissions.sh
-
-# Verificación completa pre-deploy
-./server/scripts/pre-deploy-check.sh
-```
+   - Frontend: http://localhost:5173
+   - Backend: http://localhost:5055
 
 ## 📁 Estructura del Proyecto
 
 ```
 Pedidos/
-├── src/                      # Frontend React
-│   ├── components/          # Componentes
-│   ├── pages/              # Páginas
-│   ├── hooks/              # Custom hooks
-│   ├── services/           # Servicios API
-│   └── utils/              # Utilidades
-├── server/                  # Backend Node.js
-│   ├── routes/             # Rutas API
-│   ├── middleware/         # Middlewares
-│   ├── utils/              # Utilidades
-│   └── scripts/            # Scripts de deploy
-├── public/                 # Assets estáticos
-├── amplify.yml            # Config AWS Amplify
-└── package.json           # Dependencias
-
-Documentación:
-├── SETUP_COMPLETO.md      # ⭐ Empieza aquí
-├── DEPLOY_CHECKLIST.md    # Guía de deploy
-└── DEPLOY_AWS.md          # Docs técnicas
+├── frontend/                # Frontend React
+│   ├── src/
+│   │   ├── components/     # Componentes reutilizables
+│   │   ├── pages/         # Páginas principales
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── services/      # Servicios API
+│   │   └── utils/         # Utilidades
+│   ├── public/            # Assets estáticos
+│   └── package.json
+│
+├── backend/               # Backend Node.js
+│   ├── index.js          # Servidor Express
+│   ├── routes/           # Rutas API
+│   ├── middleware/       # Middleware personalizado
+│   ├── utils/            # Utilidades backend
+│   ├── scripts/          # Scripts de deployment y migración
+│   └── package.json
+│
+├── shared/               # Código compartido
+│   └── utils/           # Utilidades compartidas
+│
+├── docs/                # Documentación
+│   ├── DEPLOY_BACKEND.md
+│   ├── DEPLOY_FRONTEND.md
+│   ├── DEPLOY_CHECKLIST.md
+│   └── SETUP.md
+│
+└── README.md            # Este archivo
 ```
 
-## 🔧 Configuración
+## 🔐 Seguridad
 
-### Variables de Entorno (server/.env)
+### Credenciales en Desarrollo
 
+Las credenciales se gestionan mediante variables de entorno en `backend/.env`:
+- Google Service Account JSON
+- Google Maps API Key
+- JWT Secret
+- Sheet IDs
+
+### Credenciales en Producción (AWS)
+
+En producción, todas las credenciales se almacenan en **AWS Secrets Manager**:
+- ✅ Google Service Account JSON
+- ✅ Google Maps API Key
+- ✅ JWT Secret
+- ✅ Todas las configuraciones sensibles
+
+**Nunca** commitees archivos con credenciales:
+- `beezero-*.json`
+- `*.pem`, `*.key`
+- `backend/.env`, `frontend/.env`
+- Carpeta `secret/`
+
+### Gestión de Sesiones
+
+El sistema implementa un mecanismo robusto de **invalidación automática de tokens JWT**:
+
+✅ **Características:**
+- Tokens con ID único (`jti`) para trazabilidad
+- Invalidación automática al reiniciar servidor
+- Detección automática de reinicios en el frontend
+- Logout con invalidación server-side
+- Blacklist de tokens para seguridad adicional
+
+✅ **¿Qué sucede cuando el servidor se reinicia?**
+1. Frontend detecta automáticamente el reinicio (`checkServerRestart()`)
+2. Cierra sesión automáticamente
+3. Muestra mensaje claro: "El servidor se reinició. Por favor, inicie sesión nuevamente."
+4. Redirige a login
+
+✅ **Endpoints de Autenticación:**
+```
+POST /api/auth/login       - Login y generación de token
+POST /api/auth/logout      - Logout e invalidación de token
+GET  /api/auth/me          - Información del usuario autenticado
+GET  /api/auth/server-info - Información pública del servidor (para sync)
+```
+
+📚 **Documentación Detallada:**
+- [`docs/SESSION_MANAGEMENT.md`](docs/SESSION_MANAGEMENT.md) - Arquitectura técnica completa
+- [`docs/SESSION_FIX_SUMMARY.md`](docs/SESSION_FIX_SUMMARY.md) - Resumen visual con ejemplos
+
+🧪 **Testing del Sistema de Sesiones:**
 ```bash
-# Google Sheets
-SHEET_ID=tu_sheet_id
-SHEET_NAME=Registros
-INVENTARIO_SHEET_ID=tu_inventario_id
-
-# AWS (para producción)
-AWS_REGION=us-east-1
-AWS_SECRET_NAME=pedidos/prod/all-secrets
-
-# Puerto
-PORT=5055
+cd backend
+node scripts/test-session-management.mjs
 ```
 
-### Variables de Entorno para Amplify
+## 📊 Funcionalidades
 
-```bash
-AWS_REGION=us-east-1
-AWS_SECRET_NAME=pedidos/prod/all-secrets
-NODE_ENV=production
-PORT=5055
-```
-
-## 🧪 Testing
-
-### Probar Login
-```bash
-# Local
-curl -X POST http://localhost:5055/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario","password":"password"}'
-
-# Producción (reemplaza con tu URL)
-curl -X POST https://main.dXXXXXX.amplifyapp.com/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"usuario","password":"password"}'
-```
-
-## 📊 Endpoints API
-
-### Autenticación
-- `POST /api/auth/login` - Login de usuario
+### Gestión de Pedidos
+- ✅ Crear, editar, cancelar pedidos
+- ✅ Asignar bikers
+- ✅ Calcular distancias con Google Maps
+- ✅ Cálculo automático de precios
+- ✅ Estados: Pendiente → En Proceso → Entregado → Cancelado
 
 ### Clientes
-- `GET /api/client/clientes` - Listar clientes
-- Requiere autenticación JWT
+- ✅ Vista de pedidos por cliente
+- ✅ Formulario simplificado para clientes
+- ✅ Tracking de pedidos
+- ✅ Autenticación segura por backend
 
-### Notas
-- `GET /api/notes` - Obtener notas
-- `POST /api/notes` - Crear nota
-- `PUT /api/notes/:id` - Actualizar nota
-- `DELETE /api/notes/:id` - Eliminar nota
+### Administración
+- ✅ Dashboard con estadísticas
+- ✅ Gestión de horarios
+- ✅ Inventario (admin)
+- ✅ Reportes y análisis
+- ✅ Sistema de notas
 
-## 💰 Costos Estimados (AWS)
+### Integraciones
+- ✅ Google Sheets (lectura/escritura)
+- ✅ Google Maps (distancias y geolocalización)
+- ✅ DynamoDB (persistencia de usuarios)
+- ✅ WhatsApp (notificaciones)
 
-- **AWS Amplify**: ~$15-30/mes
-- **AWS Secrets Manager**: ~$0.40/mes
-- **AWS DynamoDB**: Free tier (25 GB storage)
-- **Total**: ~$16-31/mes
+## 🛠️ Scripts Disponibles
 
-## 🆘 Troubleshooting
-
-### Error: "No se pudo calcular la distancia"
-- Verifica que GOOGLE_MAPS_API_KEY está configurada
-- Verifica que las APIs están habilitadas en Google Cloud Console
-
-### Error: "Access Denied to Secrets Manager"
-- Verifica que el rol de Amplify tiene la política adjunta
-- Ejecuta: `./server/scripts/setup-iam-permissions.sh`
-
-### Error: "Google Sheets API error"
-- Verifica que GOOGLE_SERVICE_ACCOUNT_JSON está en AWS Secrets
-- Verifica que la cuenta de servicio tiene acceso al spreadsheet
-
-## 📚 Recursos
-
-- [Guía de Deploy Completa](./SETUP_COMPLETO.md)
-- [AWS Amplify Docs](https://docs.amplify.aws/)
-- [Google Sheets API](https://developers.google.com/sheets/api)
-- [Google Maps API](https://developers.google.com/maps)
-
-## 👥 Usuarios
-
-Los usuarios se gestionan en AWS DynamoDB. Para agregar usuarios, usa el script en `server/scripts/` o la consola de DynamoDB.
-
-## 🔄 Actualizar Secretos
-
+### Monorepo (Raíz)
 ```bash
-# Método 1: Script automatizado
-node server/scripts/migrate-secrets-to-aws.mjs
-
-# Método 2: AWS CLI
-aws secretsmanager update-secret \
-  --secret-id pedidos/prod/all-secrets \
-  --secret-string file://secrets.json
+npm run dev              # Inicia frontend y backend
+npm run install:all      # Instala todas las dependencias
+npm run build:frontend   # Build del frontend
+npm run start:backend    # Inicia backend en producción
 ```
 
-## 📝 Logs
+### Frontend
+```bash
+cd frontend
+npm run dev              # Desarrollo (puerto 5173)
+npm run build            # Build para producción
+npm run preview          # Preview del build
+```
 
-### Local
-- Logs del servidor: `server/logs/`
-- Combined logs: `server/logs/combined.log`
-- Error logs: `server/logs/error.log`
+### Backend
+```bash
+cd backend
+npm run dev              # Desarrollo con nodemon
+npm start                # Producción
+```
 
-### Producción (AWS)
-- Amplify Console → App → Hosting → Logs
-- CloudWatch → Log Groups → `/aws/amplify/pedidos`
+## 🚀 Deployment a AWS
 
-## 🎯 Próximos Pasos
+### Pre-requisitos
+1. Cuenta de AWS configurada
+2. AWS CLI instalado y configurado
+3. Credenciales migradas a Secrets Manager
 
-1. ✅ Todo está configurado localmente
-2. 📖 Lee [SETUP_COMPLETO.md](./SETUP_COMPLETO.md) para deploy a AWS
-3. 🚀 Sigue [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) paso a paso
-4. 🌐 Deploy a AWS Amplify
-5. 🎉 ¡Comparte tu link!
+### Deployment del Backend (Elastic Beanstalk)
+
+```bash
+# Crear y desplegar por primera vez
+./backend/scripts/eb-create.sh
+
+# Actualizar código
+./backend/scripts/eb-deploy.sh
+
+# Ver estado
+./backend/scripts/eb-status.sh
+
+# Ver logs
+./backend/scripts/eb-logs.sh
+
+# Pausar (ahorrar costos)
+./backend/scripts/eb-stop.sh
+
+# Reanudar
+./backend/scripts/eb-start.sh
+```
+
+Ver documentación completa en [`docs/DEPLOY_BACKEND.md`](docs/DEPLOY_BACKEND.md)
+
+### Deployment del Frontend (AWS Amplify)
+
+1. Conecta tu repositorio Git a AWS Amplify
+2. Configura variables de entorno en Amplify:
+   ```
+   VITE_API_URL=<URL-del-backend-en-elastic-beanstalk>
+   ```
+3. Amplify detectará automáticamente el `amplify.yml`
+4. Deploy automático en cada push a `master`
+
+Ver documentación completa en [`docs/DEPLOY_FRONTEND.md`](docs/DEPLOY_FRONTEND.md)
+
+### Migración de Usuarios a DynamoDB
+
+Si necesitas migrar usuarios del archivo hardcodeado a DynamoDB:
+
+```bash
+cd backend
+node scripts/migrate-users-to-dynamodb.mjs
+```
+
+## 🐛 Troubleshooting
+
+### Frontend no conecta con Backend
+
+1. **Desarrollo Local:**
+   - Verifica que el backend esté corriendo en `http://localhost:5055`
+   - Revisa las variables de entorno en `backend/.env`
+   - Verifica que no haya errores en la consola del backend
+
+2. **Producción:**
+   - Verifica que `VITE_API_URL` esté configurada en Amplify
+   - Verifica que el backend esté corriendo en Elastic Beanstalk
+   - Revisa CORS en `backend/index.js`
+
+### Errores de autenticación
+
+1. **Desarrollo:**
+   - Verifica que el archivo de Google Service Account esté en la ubicación correcta
+   - Revisa que las credenciales en `.env` sean correctas
+   - Verifica que el JWT secret esté configurado
+
+2. **Producción:**
+   - Verifica que los secretos existan en AWS Secrets Manager
+   - Verifica permisos IAM del rol de Elastic Beanstalk
+   - Revisa logs en CloudWatch
+
+### Health Check Failing
+
+```bash
+# Local
+curl http://localhost:5055/health
+
+# Producción
+curl https://tu-backend.elasticbeanstalk.com/health
+```
+
+El endpoint `/health` muestra el estado de todos los servicios:
+- AWS Secrets Manager
+- DynamoDB
+- Google Sheets API
+- Google Maps API
+
+## 📚 Documentación Adicional
+
+### Deployment y Setup
+- [`docs/SETUP.md`](docs/SETUP.md) - Setup inicial completo
+- [`docs/DEPLOY_BACKEND.md`](docs/DEPLOY_BACKEND.md) - Deploy del backend
+- [`docs/DEPLOY_FRONTEND.md`](docs/DEPLOY_FRONTEND.md) - Deploy del frontend
+- [`docs/DEPLOY_CHECKLIST.md`](docs/DEPLOY_CHECKLIST.md) - Checklist completo
+
+### Seguridad y Autenticación
+- [`docs/SESSION_MANAGEMENT.md`](docs/SESSION_MANAGEMENT.md) - Sistema de gestión de sesiones y tokens
+- [`docs/SESSION_FIX_SUMMARY.md`](docs/SESSION_FIX_SUMMARY.md) - Resumen de solución a sesiones persistentes
+- [`docs/MEJORAS_IMPLEMENTADAS.md`](docs/MEJORAS_IMPLEMENTADAS.md) - Mejoras de seguridad pre-deployment
+
+### Optimización y Performance
+- [`docs/MAPS_VALIDATION_SYSTEM.md`](docs/MAPS_VALIDATION_SYSTEM.md) - Sistema optimizado de validación de Maps
+- [`docs/PLAN_OPTIMIZACION.md`](docs/PLAN_OPTIMIZACION.md) - Plan completo de refactorización
+- [`docs/PLAN_OPTIMIZACION_RESUMEN.md`](docs/PLAN_OPTIMIZACION_RESUMEN.md) - Resumen ejecutivo del plan
+- [`docs/REFACTORING_CHECKLIST.md`](docs/REFACTORING_CHECKLIST.md) - Checklist paso a paso
 
 ## 🤝 Contribuir
 
-Este es un proyecto privado. Para cambios:
-1. Crea una rama feature
-2. Haz tus cambios
-3. Haz commit con mensajes descriptivos
-4. Push y crea PR
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
-## 📄 Licencia
+## 📝 Licencia
 
-Privado - Todos los derechos reservados
+Este proyecto es privado y confidencial.
+
+## 👥 Soporte
+
+Para problemas o preguntas, contacta al equipo de desarrollo.
 
 ---
 
-**¿Listo para deployar?** → Empieza con [SETUP_COMPLETO.md](./SETUP_COMPLETO.md) 🚀
+**Última actualización**: Enero 2026 - Configurado para AWS

@@ -1,39 +1,27 @@
 version: 1
 
 # Configuración para AWS Amplify
-# Full-stack app: React frontend + Node.js backend
-# IMPORTANTE: Frontend se ejecuta PRIMERO, Backend DESPUÉS
+# Frontend en carpeta frontend/
+# Backend desplegado separadamente en Elastic Beanstalk
 
 frontend:
   phases:
     preBuild:
       commands:
+        - cd frontend
         - npm ci
     build:
       commands:
         - npm run build
   artifacts:
-    baseDirectory: dist
+    baseDirectory: frontend/dist
     files:
       - '**/*'
   cache:
     paths:
-      - node_modules/**/*
+      - frontend/node_modules/**/*
 
-backend:
-  phases:
-    preBuild:
-      commands:
-        - cd server
-        - npm ci
-        - cd ..
-    build:
-      commands:
-        - echo "Backend build completed"
-  artifacts:
-    baseDirectory: server
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - server/node_modules/**/*
+# Variables de entorno que Amplify debe inyectar en el build
+# Estas deben configurarse en la consola de Amplify también
+# VITE_API_URL: URL del backend en Elastic Beanstalk
+# Ejemplo: https://pedidos-backend-prod.us-east-1.elasticbeanstalk.com

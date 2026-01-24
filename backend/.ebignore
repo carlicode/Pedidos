@@ -1,0 +1,15 @@
+# Elastic Beanstalk ignore
+# Similar a .gitignore pero para EB
+
+node_modules/
+npm-debug.log
+.env
+*.key
+*.json
+.DS_Store
+logs/*.log
+test-*.mjs
+test-*.sh
+
+# Archivos de desarrollo
+scripts/
