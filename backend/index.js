@@ -130,7 +130,8 @@ const corsOptions = {
     
     const allowedOrigins = [
       process.env.FRONTEND_URL,
-      'https://master.d3bpt5tsbpx0os.amplifyapp.com',
+      'https://master.d3i6av0lx664fk.amplifyapp.com', // Amplify URL actual
+      'https://master.d3bpt5tsbpx0os.amplifyapp.com', // Amplify URL anterior
       'http://localhost:5173',
       'http://localhost:4173',
       'http://127.0.0.1:5173',
