@@ -2,6 +2,7 @@ version: 1
 
 # Configuración para AWS Amplify
 # Full-stack app: React frontend + Node.js backend
+# IMPORTANTE: Frontend se ejecuta PRIMERO, Backend DESPUÉS
 
 frontend:
   phases:
