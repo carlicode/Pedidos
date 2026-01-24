@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import Papa from 'papaparse'
 import { toast } from 'react-toastify'
 import SearchableSelect from '../components/SearchableSelect.jsx'
@@ -18,6 +18,12 @@ import { useTimer } from '../hooks/useTimer.js'
 import { useOrderLogging } from '../hooks/useOrderLogging.js'
 import { useWhatsApp } from '../hooks/useWhatsApp.js'
 import { useKanban } from '../hooks/useKanban.js'
+import useOrderForm from '../hooks/useOrderForm.js'
+import useAddressAutofill from '../hooks/useAddressAutofill.js'
+import usePriceCalculation from '../hooks/usePriceCalculation.js'
+import useDistanceCalculation from '../hooks/useDistanceCalculation.js'
+import useOrderValidation from '../hooks/useOrderValidation.js'
+import useAutoDistanceCalculation from '../hooks/useAutoDistanceCalculation.js'
 import { 
   getBoliviaTime, 
   getBoliviaDateTime, 
@@ -80,11 +86,13 @@ import { validateForm } from '../utils/formValidator.js'
 import {
   getEmpresaMapa,
   getClienteInfo,
-  calculateDayOfWeek
+  calculateDayOfWeek,
+  getEmpresaDescripcion
 } from '../utils/dataHelpers.js'
 import { generateWhatsAppURL } from '../utils/whatsAppUtils.js'
 import MultiDateCalendar from '../components/orders/MultiDateCalendar.jsx'
 import MissingDataModal from '../components/orders/MissingDataModal.jsx'
+import InfoAdicionalModal from '../components/InfoAdicionalModal.jsx'
 import { generarPDFConPlantilla, generatePDFResumen, generarPDFConHTML } from '../services/pdfService.js'
 import { formatToStandardDate, prepareDateForSheet, normalizeOrderDate, formatDateForDisplay, convertToISO } from '../services/dateService.js'
 
@@ -146,7 +154,16 @@ export default function Orders() {
 
   // No necesitamos cargar Google Maps JS, solo usamos la API HTTP
 
-  const [form, setForm] = useState(initialOrder)
+  // Form state management using custom hooks
+  // REFACTORED: Using useOrderForm hook for consistent state management
+  const {
+    form,
+    setForm,
+    handleFieldChange: baseHandleFieldChange,
+    updateFields,
+    resetForm: baseResetForm
+  } = useOrderForm(initialOrder)
+  
   const [orders, setOrders] = useState([])
   const [filter, setFilter] = useState('')
   
@@ -266,8 +283,47 @@ export default function Orders() {
   const [bikersAgregar, setBikersAgregar] = useState([]) // Para "Agregar Pedido"
   const [loadingBikersAgregar, setLoadingBikersAgregar] = useState(false)
   const [notification, setNotification] = useState(null)
-  const [isCalculatingDistance, setIsCalculatingDistance] = useState(false)
-  const [precioEditadoManualmente, setPrecioEditadoManualmente] = useState(false)
+  
+  // Función de notificación (debe estar definida antes de usarse)
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type })
+  }
+  
+  // Custom hooks for form logic (REFACTORED)
+  // Price calculation hook
+  const {
+    precioEditadoManualmente,
+    setPrecioEditadoManualmente,
+    calculatePriceFromDistance,
+    handlePrecioManualEdit,
+    autoUpdatePrice,
+    resetPrecioManualFlag,
+    calculateAndUpdatePrice
+  } = usePriceCalculation(form, { showNotification })
+  
+  // Distance calculation hook (with callbacks for logging and error handling)
+  const {
+    isCalculating: isCalculatingDistance,
+    lastError: lastDistanceCalculationError,
+    calculateDistanceBetween,
+    calculateAndUpdateDistance,
+    clearError: clearDistanceError
+  } = useDistanceCalculation({ 
+    showNotification, 
+    distanceBuffer: DISTANCE_BUFFER_KM,
+    onError: (errorObj) => {
+      setLastDistanceError(errorObj)
+    },
+    onLog: logToCSV
+  })
+  
+  // Address autofill hook (needs empresas, so will be instantiated below after empresas state)
+  // Validation hook
+  const {
+    validateOrderForm,
+    validateAndNotify,
+    removeErrorClassIfFilled
+  } = useOrderValidation({ showNotification })
   
   // Estados para validación de links
   const [validacionRecojo, setValidacionRecojo] = useState({ estado: null, mensaje: '' }) // null | 'validando' | 'valido' | 'invalido'
@@ -302,11 +358,6 @@ export default function Orders() {
   const [duplicateSuccessModal, setDuplicateSuccessModal] = useState({ show: false, count: 0, lastDate: null })
   const [missingDataModal, setMissingDataModal] = useState({ show: false, order: null })
   
-  // Función de notificación (debe estar definida antes de usarse)
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type })
-  }
-  
   // Hook de Kanban para gestionar drag & drop y cambios de estado
   const kanbanHook = useKanban(
     orders,
@@ -330,6 +381,20 @@ export default function Orders() {
   // Estados para "Cliente avisa"
   const [recojoClienteAvisa, setRecojoClienteAvisa] = useState(false)
   const [entregaClienteAvisa, setEntregaClienteAvisa] = useState(false)
+  
+  // Address autofill hook (REFACTORED - extraído de handleChange)
+  const {
+    handleRecojoChange,
+    handleEntregaChange,
+    infoModalState: addressInfoModalState,
+    closeInfoModal: closeAddressInfoModal,
+    setInfoModalState: setAddressInfoModalState
+  } = useAddressAutofill(empresas, editingOrder ? 'edit' : 'create', {
+    recojoManual,
+    entregaManual,
+    showNotification
+  })
+  
   // Estados para gestión de cobros y pagos
   const [cobrosPagosData, setCobrosPagosData] = useState([])
   const [descuentosClientes, setDescuentosClientes] = useState({})
@@ -515,12 +580,18 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       (empresas.length === 0 || empresas.some(emp => emp.empresa === entregaNombre))
     
     // Auto-rellenar formulario con los datos de la cotización
+    // Obtener descripciones de empresas si son válidas
+    const descripcionRecojo = esRecojoEmpresa && empresas.length > 0 ? getEmpresaDescripcion(recojoNombre, empresas) : ''
+    const descripcionEntrega = esEntregaEmpresa && empresas.length > 0 ? getEmpresaDescripcion(entregaNombre, empresas) : ''
+    
     setForm(prev => ({
       ...prev,
       recojo: recojoNombre || 'Sin especificar',
       direccion_recojo: datosCotizacion.direccion_recojo || (esRecojoEmpresa && empresas.length > 0 ? getEmpresaMapa(recojoNombre) : ''),
+      info_direccion_recojo: datosCotizacion.info_direccion_recojo || descripcionRecojo || prev.info_direccion_recojo || '',
       entrega: entregaNombre || 'Sin especificar',
       direccion_entrega: datosCotizacion.direccion_entrega || (esEntregaEmpresa && empresas.length > 0 ? getEmpresaMapa(entregaNombre, empresas) : ''),
+      info_direccion_entrega: datosCotizacion.info_direccion_entrega || descripcionEntrega || prev.info_direccion_entrega || '',
       medio_transporte: datosCotizacion.medio_transporte || '',
       distancia_km: datosCotizacion.distancia_km || '',
       precio_bs: datosCotizacion.precio_bs || ''
@@ -1231,10 +1302,18 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           return null // No incluir bikers sin pedidos en el rango
         }
         
+        // Helper para parsear precios que pueden venir con coma como separador decimal
+        const parsePrecio = (valor) => {
+          if (!valor && valor !== 0) return 0
+          const str = String(valor).trim().replace(',', '.')
+          const num = parseFloat(str)
+          return isNaN(num) ? 0 : num
+        }
+        
         // Calcular totales
         const totalEntregas = pedidosBiker.length
         const totalCarreras = pedidosBiker.reduce((sum, pedido) => {
-          const precio = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+          const precio = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
           return sum + precio
         }, 0)
         
@@ -1245,20 +1324,22 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           if (metodoPago === 'A cuenta') {
             return sum // No sumar al total pagable
           }
-          const precio = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+          const precio = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
           return sum + precio
         }, 0)
         
-        // El pago del biker es el 70% del total de carreras PAGABLES (excluyendo "A cuenta")
-        const pagoBiker = totalCarrerasPagables * 0.7
+        // El pago del biker es el total de carreras PAGABLES (excluyendo "A cuenta")
+        // NO se aplica porcentaje, se usa el precio total completo
+        const pagoBiker = totalCarrerasPagables
         
         // Crear detalle de entregas con todas las columnas necesarias
         const entregas = pedidosBiker.map(pedido => {
-          const precioCarrera = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+          const precioCarrera = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
           const metodoPago = pedido['Método pago pago'] || pedido.metodo_pago || 'Efectivo'
           
           // Para carreras "A cuenta", el pago al biker es 0
-          const pagoBikerCalculado = metodoPago === 'A cuenta' ? 0 : precioCarrera * 0.7
+          // Para otras carreras, usar el precio total completo (NO aplicar porcentaje)
+          const pagoBikerCalculado = metodoPago === 'A cuenta' ? 0 : precioCarrera
           
           return {
             // Columnas principales del pedido
@@ -1285,7 +1366,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           estado: pedido.Estado || pedido.estado || 'N/A',
           estadoPago: pedido['Estado de pago'] || pedido.estado_pago || 'N/A',
           observaciones: pedido.Observaciones || pedido.observaciones || '',
-            pagoBiker: pagoBikerCalculado, // Siempre 70% del precio
+            pagoBiker: pagoBikerCalculado, // Precio total completo (sin porcentaje)
             diaSemana: pedido['Dia de la semana'] || pedido.dia_semana || 'N/A',
             cobroPago: pedido['Cobro o pago'] || pedido.cobro_pago || 'N/A',
             montoCobroPago: parseFloat(pedido['Monto cobro o pago'] || pedido.monto_cobro_pago || 0),
@@ -2254,111 +2335,124 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     showNotification('🔄 Recojo y Entrega intercambiados', 'success')
   }
 
-  // Función separada para calcular distancia y precio
-  const calculateDistanceAndPrice = async (direccionRecojo, direccionEntrega, medioTransporte) => {
+  // Función separada para calcular distancia y precio (memoizada para evitar re-renders)
+  const calculateDistanceAndPrice = useCallback(async (direccionRecojo, direccionEntrega, medioTransporte) => {
     if (!direccionRecojo || !direccionEntrega) {
       return
     }
 
-    // Evitar cálculos múltiples simultáneos
+    // Evitar cálculos múltiples simultáneos (usando estado del hook)
     if (isCalculatingDistance) {
       return
     }
 
-    setIsCalculatingDistance(true)
+    // Usar el hook para calcular distancia (REFACTORED)
+    const distance = await calculateDistanceBetween(direccionRecojo, direccionEntrega)
 
-    showNotification('🔄 Calculando distancia...', 'success')
-    try {
-      // Limpiar URLs antes de calcular
-      const cleanRecojo = cleanGoogleMapsUrl(direccionRecojo)
-      const cleanEntrega = cleanGoogleMapsUrl(direccionEntrega)
-      const distance = await calculateDistanceWrapper(cleanRecojo, cleanEntrega)
-
-      if (distance) {
-        // Usar "Bicicleta" por defecto si no hay medio de transporte
-        const medioTransporteActual = medioTransporte && medioTransporte.trim() !== '' ? medioTransporte : 'Bicicleta'
+    if (distance !== null && distance > 0) {
+      // Usar "Bicicleta" por defecto si no hay medio de transporte
+      const medioTransporteActual = medioTransporte && medioTransporte.trim() !== '' ? medioTransporte : 'Bicicleta'
+      
+      // Verificar si el método de pago actual es Cuenta
+      const metodoPagoActual = form.metodo_pago || 'Efectivo'
+      
+      // Siempre calcular el precio para guardarlo en el sheet
+      const precio = calculatePrice(distance, medioTransporteActual)
         
-        // Verificar si el método de pago actual es Cuenta
-        const metodoPagoActual = form.metodo_pago || 'Efectivo'
-        
-        // Siempre calcular el precio para guardarlo en el sheet
-        const precio = calculatePrice(distance, medioTransporteActual)
-          
-        // IMPORTANTE: Resetear flag de precio editado manualmente cuando se recalcula distancia
-        // Esto permite que el precio se recalcule automáticamente en modo edición
-        setPrecioEditadoManualmente(false)
-        
-        if (metodoPagoActual === 'Cuenta' || metodoPagoActual === 'A cuenta') {
-          // Para "Cuenta" o "A cuenta", guardar el precio calculado pero mostrar el método del cliente
-          setForm((prev) => ({ 
-            ...prev, 
-            distancia_km: distance,
-            medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
-            precio_bs: precio // Guardar el precio real en el sheet
-          }))
-          showNotification(`📏 Distancia: ${distance} km • 💳 Precio calculado: ${precio} Bs (${metodoPagoActual} del cliente)`, 'success')
-        } else {
-          setForm((prev) => ({ 
-            ...prev, 
-            distancia_km: distance,
-            medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
-            precio_bs: precio 
-          }))
-          showNotification(`📏 Distancia: ${distance} km • 💰 Precio: ${precio} Bs`, 'success')
-        }
+      // IMPORTANTE: Resetear flag de precio editado manualmente cuando se recalcula distancia
+      // Esto permite que el precio se recalcule automáticamente
+      setPrecioEditadoManualmente(false)
+      
+      if (metodoPagoActual === 'Cuenta' || metodoPagoActual === 'A cuenta') {
+        // Para "Cuenta" o "A cuenta", guardar el precio calculado pero mostrar el método del cliente
+        setForm((prev) => ({ 
+          ...prev, 
+          distancia_km: distance,
+          medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
+          precio_bs: precio // Guardar el precio real en el sheet
+        }))
+        showNotification(`📏 Distancia: ${distance} km • 💳 Precio calculado: ${precio} Bs (${metodoPagoActual} del cliente)`, 'success')
       } else {
-        // Mostrar modal de error (el error ya está guardado en lastDistanceError)
-        setShowDistanceErrorModal(true)
-        showNotification('⚠️ No se pudo calcular la distancia. Revisa los links.', 'warning')
+        setForm((prev) => ({ 
+          ...prev, 
+          distancia_km: distance,
+          medio_transporte: medioTransporteActual, // Actualizar medio de transporte si se usó el default
+          precio_bs: precio 
+        }))
+        showNotification(`📏 Distancia: ${distance} km • 💰 Precio: ${precio} Bs`, 'success')
       }
-    } catch (error) {
-      // Guardar el error si no se guardó antes
-      if (!lastDistanceError) {
+    } else {
+      // Mostrar modal de error si hay un error del hook
+      if (lastDistanceCalculationError) {
         setLastDistanceError({
-          message: error.message,
+          message: lastDistanceCalculationError.message,
           origin: form.direccion_recojo,
           destination: form.direccion_entrega,
-          fullError: error.stack || error.toString()
+          fullError: lastDistanceCalculationError.stack || lastDistanceCalculationError.toString()
         })
       }
-      // Mostrar modal de error
       setShowDistanceErrorModal(true)
-      showNotification(`❌ Error al calcular distancia: ${error.message}`, 'error')
-    } finally {
-      setIsCalculatingDistance(false)
+      showNotification('⚠️ No se pudo calcular la distancia. Revisa los links.', 'warning')
     }
-  }
+  }, [
+    isCalculatingDistance,
+    calculateDistanceBetween,
+    calculatePrice,
+    form.metodo_pago,
+    setPrecioEditadoManualmente,
+    setForm,
+    showNotification,
+    lastDistanceCalculationError,
+    setLastDistanceError,
+    setShowDistanceErrorModal
+  ])
+
+  // Auto distance calculation hook (MODULARIZED - calcula automáticamente cuando cambian direcciones)
+  // This hook monitors form state and automatically calculates distance when both addresses are available
+  // Must be defined after calculateDistanceAndPrice function
+  useAutoDistanceCalculation(
+    form,
+    calculateDistanceAndPrice,
+    {
+      recojoClienteAvisa,
+      entregaClienteAvisa,
+      debounceMs: 300 // Esperar 300ms después del último cambio antes de calcular
+    }
+  )
 
   const handleChange = async (e) => {
     const { name, value } = e.target
     let updatedForm = { [name]: value }
     
+    // === CUSTOM MODES ===
     // Manejar modo personalizado para cliente
     if (name === 'cliente' && value === '__CUSTOM__') {
       updatedForm = { cliente: '', clienteCustom: true }
+      setForm((prev) => ({ ...prev, ...updatedForm }))
+      return
     }
     
     // Manejar modo personalizado para biker
     if (name === 'biker' && value === '__CUSTOM__') {
       updatedForm = { biker: '', bikerCustom: true }
-    }
-    
-    // Debug específico para descripción de cobro o pago
-    if (name === 'descripcion_cobro_pago') {
-
+      setForm((prev) => ({ ...prev, ...updatedForm }))
+      return
     }
 
-    // Auto-llenar direcciones con URLs de Maps (solo para modo dropdown)
+    // === ADDRESS AUTOFILL LOGIC (REFACTORED) ===
+    // Use custom hook for recojo/entrega changes
+    // Auto distance calculation is handled by useAutoDistanceCalculation hook
     if (name === 'recojo' && !recojoManual) {
-      const empresaMapa = getEmpresaMapa(value, empresas) || ''
-      updatedForm.direccion_recojo = empresaMapa
-
+      handleRecojoChange(value, form, setForm)
+      // Distance calculation will be triggered automatically by useAutoDistanceCalculation
+      return
     } else if (name === 'entrega' && !entregaManual) {
-      const empresaMapa = getEmpresaMapa(value, empresas) || ''
-      updatedForm.direccion_entrega = empresaMapa
-
+      handleEntregaChange(value, form, setForm)
+      // Distance calculation will be triggered automatically by useAutoDistanceCalculation
+      return
     }
     
+    // === MANUAL ADDRESS MODE ===
     // Para modo manual, limpiar URLs de Google Maps cuando se ingresan
     if ((name === 'direccion_recojo' || name === 'direccion_entrega') && value) {
       updatedForm[name] = cleanGoogleMapsUrl(value)
@@ -2370,99 +2464,77 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         } else {
           validarLinkGoogleMaps(cleanGoogleMapsUrl(value), 'entrega')
         }
-      }, 500) // Esperar 500ms después de que el usuario deje de escribir
+      }, 500)
     }
     
     // Para modo manual, el enlace pegado es lo que cuenta
     // Auto-completar el nombre cuando se pega una dirección en modo manual
     if (name === 'direccion_recojo' && recojoManual && value) {
-      // Validar enlace de Google Maps
       if (!validateGoogleMapsLink(value)) {
         showNotification('⚠️ Por favor ingresa un enlace válido de Google Maps', 'error')
-        return // No actualizar el formulario si el enlace no es válido
+        return
       }
       
-      // Si el campo recojo está vacío, auto-completarlo con "Dirección manual"
       if (!form.recojo || form.recojo.trim() === '') {
         updatedForm.recojo = 'Sin especificar'
       }
     } else if (name === 'direccion_entrega' && entregaManual && value) {
-      // Validar enlace de Google Maps
       if (!validateGoogleMapsLink(value)) {
         showNotification('⚠️ Por favor ingresa un enlace válido de Google Maps', 'error')
-        return // No actualizar el formulario si el enlace no es válido
+        return
       }
       
-      // Si el campo entrega está vacío, auto-completarlo con "Dirección manual"
       if (!form.entrega || form.entrega.trim() === '') {
         updatedForm.entrega = 'Sin especificar'
       }
     }
     
+    // === DATE HANDLING ===
     // Auto-calcular día de la semana cuando cambie la fecha
     if (name === 'fecha' && value) {
       const diaSemana = calculateDayOfWeek(value)
       updatedForm.dia_semana = diaSemana
-
     }
     
-    // Auto-completar WhatsApp cuando se seleccione un biker
+    // === BIKER WHATSAPP AUTOFILL ===
     if (name === 'biker') {
       if (value && value !== '__CUSTOM__') {
-        // Si se selecciona "ASIGNAR BIKER", limpiar el WhatsApp
         if (value === 'ASIGNAR BIKER') {
           updatedForm.whatsapp = ''
-
         } else {
-          // Para otros bikers, auto-completar WhatsApp
-        const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === value)
-        if (selectedBiker) {
-          // Buscar WhatsApp en diferentes posibles propiedades
-          const whatsappValue = selectedBiker.whatsapp || selectedBiker.WhatsApp || selectedBiker['WhatsApp'] || selectedBiker.telefono || 'N/A'
-          if (whatsappValue && whatsappValue !== 'N/A') {
-            updatedForm.whatsapp = whatsappValue
-
+          const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === value)
+          if (selectedBiker) {
+            const whatsappValue = selectedBiker.whatsapp || selectedBiker.WhatsApp || selectedBiker['WhatsApp'] || selectedBiker.telefono || 'N/A'
+            if (whatsappValue && whatsappValue !== 'N/A') {
+              updatedForm.whatsapp = whatsappValue
             }
           }
         }
       } else if (!value) {
-        // Limpiar WhatsApp si se deselecciona el biker
         updatedForm.whatsapp = ''
-
       }
     }
     
-    // Detectar cuando el usuario edita manualmente el precio
+    // === PRICE MANUAL EDIT (REFACTORED) ===
     if (name === 'precio_bs') {
-      setPrecioEditadoManualmente(true)
-
-      // Si es modo "Cuenta", mostrar notificación especial
-      if (form.metodo_pago === 'Cuenta') {
-        showNotification('✏️ Precio editado manualmente (Cuenta del cliente)', 'info')
-      }
+      handlePrecioManualEdit(value, setForm, form.metodo_pago)
+      return
     }
     
-    // Limpiar monto si se deselecciona cobro/pago
+    // === COBRO/PAGO HANDLING ===
     if (name === 'cobro_pago' && (!value || value.trim() === '')) {
       updatedForm.monto_cobro_pago = ''
     }
     
-    // Debug para campos de cobro/pago
-    if (name === 'cobro_pago' || name === 'monto_cobro_pago') {
-
-    }
-    
-    // Actualizar el formulario
+    // === UPDATE FORM ===
     setForm((prev) => ({ ...prev, ...updatedForm }))
     
-    // Remover clase de error si el campo ahora tiene valor
-    if (value && value.trim() !== '' && e.target && e.target.classList) {
-      e.target.classList.remove('field-required')
-    }
+    // Remove error class if field now has value
+    removeErrorClassIfFilled(e)
     
     const newForm = { ...form, ...updatedForm }
     
-    // Si se edita manualmente la distancia, recalcular precio automáticamente
+    // === DISTANCE MANUAL EDIT WITH AUTO-PRICE RECALC ===
     if (name === 'distancia_km') {
       const distanciaValue = parseFloat(value) || 0
       const tieneMedioTransporte = newForm.medio_transporte && newForm.medio_transporte.trim() !== ''
@@ -2489,7 +2561,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           showNotification('✏️ Distancia editada manualmente. El precio no se recalcula automáticamente.', 'info')
         }
       } else if (distanciaValue === 0 || !tieneMedioTransporte) {
-        // Si la distancia es 0 o no hay medio de transporte, limpiar precio
         setForm((prev) => ({ 
           ...prev, 
           distancia_km: distanciaValue > 0 ? distanciaValue.toString() : '',
@@ -2497,92 +2568,70 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         }))
       }
       
-      // Actualizar el formulario y retornar (no continuar con otros cálculos)
       setForm((prev) => ({ ...prev, ...updatedForm }))
       return
     }
     
-    // Solo recalcular distancia y precio si cambió algo relevante
-    const shouldRecalculate = name === 'recojo' || name === 'entrega' || name === 'medio_transporte' || name === 'metodo_pago'
+    // === AUTO-RECALCULATIONS ===
+    // Note: Distance calculation for recojo/entrega is handled automatically by useAutoDistanceCalculation hook
     
-    if (shouldRecalculate) {
-      // Verificar condiciones para cálculos
-      const tieneRecojo = newForm.direccion_recojo && newForm.direccion_recojo.trim() !== ''
-      const tieneEntrega = newForm.direccion_entrega && newForm.direccion_entrega.trim() !== ''
-      const tieneMedioTransporte = newForm.medio_transporte && newForm.medio_transporte.trim() !== ''
-
-      // CALCULAR DISTANCIA: Solo necesita recojo y entrega (y no estar en modo "Cliente avisa")
-      if (tieneRecojo && tieneEntrega && !recojoClienteAvisa && !entregaClienteAvisa && (name === 'recojo' || name === 'entrega' || name === 'direccion_recojo' || name === 'direccion_entrega')) {
-
-        await calculateDistanceAndPrice(newForm.direccion_recojo, newForm.direccion_entrega, newForm.medio_transporte)
-      }
-      
-      // MANEJAR CAMBIO DE MÉTODO DE PAGO
-      else if (name === 'metodo_pago') {
-        if (value === 'Cuenta' || value === 'A cuenta') {
-
-          if (form.distancia_km && form.medio_transporte) {
-            const precio = calculatePrice(form.distancia_km, form.medio_transporte)
-            setForm((prev) => ({ ...prev, precio_bs: precio }))
-            setPrecioEditadoManualmente(false) // Resetear flag
-            showNotification(`💳 Precio calculado: ${precio} Bs (${value} del cliente)`, 'success')
-          } else {
-            setForm((prev) => ({ ...prev, precio_bs: 0 }))
-            setPrecioEditadoManualmente(false) // Resetear flag
-            showNotification(`💳 Método: ${value} del cliente (precio: 0 Bs)`, 'success')
-          }
-        } else if (form.distancia_km && form.medio_transporte && !precioEditadoManualmente) {
-
+    // HANDLE PAYMENT METHOD CHANGE
+    if (name === 'metodo_pago') {
+      if (value === 'Cuenta' || value === 'A cuenta') {
+        if (form.distancia_km && form.medio_transporte) {
           const precio = calculatePrice(form.distancia_km, form.medio_transporte)
           setForm((prev) => ({ ...prev, precio_bs: precio }))
-          showNotification(`💰 Precio actualizado: ${precio} Bs`, 'success')
-        } else if (precioEditadoManualmente) {
-
-          showNotification('✏️ Precio editado manualmente: No se recalcula automáticamente', 'info')
+          setPrecioEditadoManualmente(false)
+          showNotification(`💳 Precio calculado: ${precio} Bs (${value} del cliente)`, 'success')
+        } else {
+          setForm((prev) => ({ ...prev, precio_bs: 0 }))
+          setPrecioEditadoManualmente(false)
+          showNotification(`💳 Método: ${value} del cliente (precio: 0 Bs)`, 'success')
         }
+      } else if (form.distancia_km && form.medio_transporte && !precioEditadoManualmente) {
+        const precio = calculatePrice(form.distancia_km, form.medio_transporte)
+        setForm((prev) => ({ ...prev, precio_bs: precio }))
+        showNotification(`💰 Precio actualizado: ${precio} Bs`, 'success')
+      } else if (precioEditadoManualmente) {
+        showNotification('✏️ Precio editado manualmente: No se recalcula automáticamente', 'info')
       }
+    }
+    
+    // HANDLE TRANSPORT TYPE CHANGE - ALWAYS RECALC PRICE
+    else if (name === 'medio_transporte') {
+      const tieneMedioTransporte = value && value.trim() !== ''
+      const distanciaValue = parseFloat(form.distancia_km) || 0
       
-      // CALCULAR PRECIO: Necesita distancia + medio de transporte (excepto si es Cuenta)
-      // IMPORTANTE: Al cambiar el medio de transporte, SIEMPRE recalcular el precio si hay distancia
-      // Esto aplica tanto en modo crear como en modo edición
-      else if (name === 'medio_transporte' && form.distancia_km && tieneMedioTransporte && !recojoClienteAvisa && !entregaClienteAvisa) {
-        const distanciaValue = parseFloat(form.distancia_km) || 0
+      if (tieneMedioTransporte && distanciaValue > 0 && !recojoClienteAvisa && !entregaClienteAvisa) {
+        const precio = calculatePrice(distanciaValue, value)
         
-        if (distanciaValue > 0) {
-          const precio = calculatePrice(distanciaValue, value)
-          
-          if (newForm.metodo_pago === 'Cuenta' || newForm.metodo_pago === 'A cuenta') {
-            setForm((prev) => ({ ...prev, precio_bs: precio }))
-            setPrecioEditadoManualmente(false) // Resetear flag al cambiar transporte
-            showNotification(`💳 Precio calculado: ${precio} Bs (${newForm.metodo_pago} del cliente)`, 'success')
-          } else {
-            // Para otros métodos, recalcular siempre que cambie el transporte
-            setForm((prev) => ({ ...prev, precio_bs: precio }))
-            setPrecioEditadoManualmente(false) // Resetear flag al cambiar transporte
-            showNotification(`💰 Precio recalculado: ${precio} Bs (${value})`, 'success')
-          }
+        if (form.metodo_pago === 'Cuenta' || form.metodo_pago === 'A cuenta') {
+          setForm((prev) => ({ ...prev, precio_bs: precio }))
+          setPrecioEditadoManualmente(false)
+          showNotification(`💳 Precio calculado: ${precio} Bs (${form.metodo_pago} del cliente)`, 'success')
+        } else {
+          setForm((prev) => ({ ...prev, precio_bs: precio }))
+          setPrecioEditadoManualmente(false)
+          showNotification(`💰 Precio recalculado: ${precio} Bs (${value})`, 'success')
         }
+      } else if (!tieneMedioTransporte) {
+        setForm((prev) => ({ ...prev, precio_bs: '' }))
+        setPrecioEditadoManualmente(false)
       }
+    }
+    
+    // CLEAR FIELDS IF RECOJO/ENTREGA REMOVED (distance calculation handled by hook)
+    else if ((name === 'recojo' || name === 'entrega') && !value) {
+      const tieneRecojo = name === 'entrega' ? (form.direccion_recojo && form.direccion_recojo.trim() !== '') : false
+      const tieneEntrega = name === 'recojo' ? (form.direccion_entrega && form.direccion_entrega.trim() !== '') : false
       
-      // LIMPIAR si se quitan datos necesarios
-      else if (name === 'recojo' || name === 'entrega') {
-        if (!tieneRecojo || !tieneEntrega) {
-
-          setForm((prev) => ({ 
-            ...prev, 
-            distancia_km: '',
-            precio_bs: '' 
-          }))
-          setPrecioEditadoManualmente(false) // Resetear flag
-        }
-      }
-      else if (name === 'medio_transporte' && !tieneMedioTransporte) {
-
+      if (!tieneRecojo || !tieneEntrega) {
         setForm((prev) => ({ 
           ...prev, 
+          distancia_km: '',
           precio_bs: '' 
         }))
-        setPrecioEditadoManualmente(false) // Resetear flag
+        setPrecioEditadoManualmente(false)
       }
     }
   }
@@ -3018,10 +3067,17 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       console.log('📡 Iniciando carga desde Google Sheets...')
       
       const data = await loadOrdersAPI()
+      console.log('📦 Datos recibidos del API:', data.length, 'pedidos')
 
       if (data && data.length > 0) {
         // Mapear los datos usando la función del servicio
         const imported = data.map((row, index) => mapRowToOrder(row, index, initialOrder, operadorDefault))
+        console.log('🔄 Pedidos mapeados:', imported.length)
+        
+        // Log de fechas para debug
+        const fechas = imported.map(o => o.fecha).filter(f => f)
+        const fechasUnicas = [...new Set(fechas)]
+        console.log('📅 Fechas encontradas:', fechasUnicas.slice(0, 10).join(', '))
 
         // Limpiar duplicados por ID (mantener solo el último)
         const uniqueOrders = imported.reduce((acc, current) => {
@@ -3071,21 +3127,36 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     // Filtrar por fecha según el tipo de vista
     if (viewType === 'day' && dateFilter) {
       // Vista por día específico
+      console.log('🔍 Filtrando por fecha:', dateFilter)
+      console.log('📦 Total pedidos antes de filtrar:', filtered.length)
+      
+      // Log de las primeras 10 fechas originales
+      const sampleDates = filtered.slice(0, 10).map(o => o.fecha)
+      console.log('📅 Muestra de fechas en pedidos:', sampleDates)
+      
       filtered = filtered.filter((o) => {
         if (o.fecha) {
           try {
             // Convertir fecha a ISO para comparar usando dateService
             const orderDate = convertToISO(o.fecha)
-            if (!orderDate) return false
+            if (!orderDate) {
+              console.log('❌ No se pudo convertir:', o.fecha, '(tipo:', typeof o.fecha, ') - Pedido ID:', o.id)
+              return false
+            }
             
-          return orderDate === dateFilter
+            const matches = orderDate === dateFilter
+            if (!matches && o.estado !== 'Pendiente') {
+              console.log('⚠️ Pedido filtrado:', { id: o.id, estado: o.estado, fecha: o.fecha, orderDate, dateFilter })
+            }
+          return matches
           } catch (error) {
-
+            console.log('❌ Error convirtiendo:', o.fecha, error, '- Pedido ID:', o.id)
             return false
           }
         }
         return false
       })
+      console.log('📊 Pedidos filtrados:', filtered.length)
     } else if (viewType === 'range' && dateRange.start && dateRange.end) {
       // Vista por rango de fechas
       filtered = filtered.filter((o) => {
@@ -3402,21 +3473,21 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       padding: '12px 24px',
                       borderRadius: '999px',
                       border: 'none',
-                      background: '#f49f10',
+                      background: '#fbbf24', /* Amarillo aclarado */
                       color: '#0f172a',
                       fontWeight: 700,
                       fontSize: '15px',
                       cursor: 'pointer',
-                      boxShadow: '0 10px 28px rgba(244, 159, 16, 0.35)',
+                      boxShadow: '0 10px 28px rgba(251, 191, 36, 0.35)', /* Sombra actualizada para amarillo aclarado */
                       transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-1px)'
-                      e.currentTarget.style.boxShadow = '0 14px 32px rgba(244, 159, 16, 0.45)'
+                      e.currentTarget.style.boxShadow = '0 14px 32px rgba(251, 191, 36, 0.45)' /* Sombra actualizada */
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 10px 28px rgba(244, 159, 16, 0.35)'
+                      e.currentTarget.style.boxShadow = '0 10px 28px rgba(251, 191, 36, 0.35)' /* Sombra actualizada */
                     }}
                   >
                     <Icon name={icon} size={18} />
@@ -3752,7 +3823,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       <div style={{
                         padding: '12px',
                         backgroundColor: '#fff3cd',
-                        border: '1px solid #ffeaa7',
+                        border: '1px solid var(--yellow)', /* Amarillo unificado */
                         borderRadius: '4px',
                         color: '#856404',
                         textAlign: 'center',
@@ -3973,7 +4044,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       <div style={{
                         padding: '12px',
                         backgroundColor: '#fff3cd',
-                        border: '1px solid #ffeaa7',
+                        border: '1px solid var(--yellow)', /* Amarillo unificado */
                         borderRadius: '4px',
                         color: '#856404',
                         textAlign: 'center',
@@ -3995,8 +4066,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           className={!form.entrega && !entregaClienteAvisa ? 'field-required' : ''}
                           required={!entregaClienteAvisa}
                         />
-                        {form.entrega && getEmpresaMapa(form.entrega) && (
-                          <a href={getEmpresaMapa(form.entrega)} target="_blank" rel="noopener noreferrer" className="btn-maps" title={`Ver en Maps: ${form.entrega}`}>
+                        {form.entrega && getEmpresaMapa(form.entrega, empresas) && (
+                          <a href={getEmpresaMapa(form.entrega, empresas)} target="_blank" rel="noopener noreferrer" className="btn-maps" title={`Ver en Maps: ${form.entrega}`}>
                             📍 Maps
                           </a>
                         )}
@@ -4115,7 +4186,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       onChange={handleChange}
                       placeholder="Seleccionar"
                       searchPlaceholder="Buscar medio de transporte..."
-                      className={!form.medio_transporte ? 'field-required' : ''}
+                      className={!form.medio_transporte ? 'field-required medio-transporte-yellow' : 'medio-transporte-yellow'}
                       required
                     />
                   </div>
@@ -4681,59 +4752,113 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         whiteSpace: 'pre-wrap'
                       }}
                     />
-                    <button 
-                      type="button"
-                      className="btn-whatsapp-large"
-                      onClick={() => {
-                        // Verificar si se seleccionó "ASIGNAR BIKER"
-                        if (form.biker === 'ASIGNAR BIKER') {
-                          // Mostrar modal de advertencia
-                          setShowAssignBikerModal(true)
-                          return
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(whatsappMessage)
+                            showNotification('✅ Mensaje copiado al portapapeles', 'success')
+                          } catch (err) {
+                            // Fallback para navegadores que no soportan clipboard API
+                            const textArea = document.createElement('textarea')
+                            textArea.value = whatsappMessage
+                            textArea.style.position = 'fixed'
+                            textArea.style.left = '-999999px'
+                            document.body.appendChild(textArea)
+                            textArea.select()
+                            try {
+                              document.execCommand('copy')
+                              showNotification('✅ Mensaje copiado al portapapeles', 'success')
+                            } catch (err2) {
+                              showNotification('❌ No se pudo copiar el mensaje', 'error')
+                            }
+                            document.body.removeChild(textArea)
+                          }
+                        }}
+                        style={{
+                          background: 'var(--yellow)',
+                          color: '#333',
+                          border: 'none',
+                          padding: '12px 24px',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          boxShadow: '0 2px 8px rgba(251, 191, 36, 0.3)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'var(--accent-light)'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.4)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'var(--yellow)'
+                          e.currentTarget.style.transform = 'translateY(0)'
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.3)'
+                        }}
+                        title="Copiar mensaje al portapapeles"
+                      >
+                        📋 Copiar mensaje
+                      </button>
+                      <button 
+                        type="button"
+                        className="btn-whatsapp-large"
+                        onClick={() => {
+                          // Verificar si se seleccionó "ASIGNAR BIKER"
+                          if (form.biker === 'ASIGNAR BIKER') {
+                            // Mostrar modal de advertencia
+                            setShowAssignBikerModal(true)
+                            return
+                          }
+                          
+                          // Si no hay biker seleccionado
+                          if (!form.biker || form.biker.trim() === '') {
+                            toast.error('❌ NO EXISTE BIKER ASIGNADO', {
+                              position: "top-center",
+                              autoClose: 3000,
+                              hideProgressBar: false,
+                              closeOnClick: true,
+                              pauseOnHover: true,
+                              draggable: true,
+                              className: "toast-error",
+                            })
+                            return
+                          }
+                          
+                          const tempOrder = { ...form }
+                          // Usar el mensaje editado si existe
+                          const whatsappURL = generateWhatsAppURL(tempOrder, bikersAgregar, whatsappMessage)
+                          window.open(whatsappURL, '_blank')
+                          
+                          // Mostrar notificación con información del destinatario
+                            const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === form.biker)
+                            if (selectedBiker && selectedBiker.whatsapp && selectedBiker.whatsapp !== 'N/A') {
+                              showNotification(`📱 Enviando WhatsApp a ${form.biker} (${selectedBiker.whatsapp})`, 'success')
+                            } else {
+                              showNotification(`📱 Enviando WhatsApp a ${form.biker} (usando WhatsApp del formulario)`, 'warning')
+                          }
+                        }}
+                        disabled={!form.biker || form.biker.trim() === ''}
+                        title={
+                          !form.biker 
+                            ? 'No hay biker asignado' 
+                            : form.biker === 'ASIGNAR BIKER'
+                            ? 'ASIGNAR BIKER no tiene WhatsApp asociado'
+                            : `Enviar WhatsApp al biker ${form.biker}`
                         }
-                        
-                        // Si no hay biker seleccionado
-                        if (!form.biker || form.biker.trim() === '') {
-                          toast.error('❌ NO EXISTE BIKER ASIGNADO', {
-                            position: "top-center",
-                            autoClose: 3000,
-                            hideProgressBar: false,
-                            closeOnClick: true,
-                            pauseOnHover: true,
-                            draggable: true,
-                            className: "toast-error",
-                          })
-                          return
-                        }
-                        
-                        const tempOrder = { ...form }
-                        // Usar el mensaje editado si existe
-                        const whatsappURL = generateWhatsAppURL(tempOrder, bikersAgregar, whatsappMessage)
-                        window.open(whatsappURL, '_blank')
-                        
-                        // Mostrar notificación con información del destinatario
-                          const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === form.biker)
-                          if (selectedBiker && selectedBiker.whatsapp && selectedBiker.whatsapp !== 'N/A') {
-                            showNotification(`📱 Enviando WhatsApp a ${form.biker} (${selectedBiker.whatsapp})`, 'success')
-                          } else {
-                            showNotification(`📱 Enviando WhatsApp a ${form.biker} (usando WhatsApp del formulario)`, 'warning')
-                        }
-                      }}
-                      disabled={!form.biker || form.biker.trim() === ''}
-                      title={
-                        !form.biker 
-                          ? 'No hay biker asignado' 
-                          : form.biker === 'ASIGNAR BIKER'
-                          ? 'ASIGNAR BIKER no tiene WhatsApp asociado'
-                          : `Enviar WhatsApp al biker ${form.biker}`
-                      }
-                      style={{
-                        opacity: (!form.biker || form.biker.trim() === '') ? 0.5 : 1,
-                        cursor: (!form.biker || form.biker.trim() === '') ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      📱 Enviar por WhatsApp {form.biker && form.biker !== 'ASIGNAR BIKER' && `a ${form.biker}`}
-                    </button>
+                        style={{
+                          opacity: (!form.biker || form.biker.trim() === '') ? 0.5 : 1,
+                          cursor: (!form.biker || form.biker.trim() === '') ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        📱 Enviar por WhatsApp {form.biker && form.biker !== 'ASIGNAR BIKER' && `a ${form.biker}`}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -6681,20 +6806,25 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       {bikersFiltrados.map((biker) => {
                       const entregasEntregadas = biker.entregas.filter(entrega => (entrega.estado || '').toLowerCase() === 'entregado')
                       if (entregasEntregadas.length === 0) return null
+                      // Helper para parsear precios que pueden venir con coma como separador decimal
+                      const parsePrecio = (valor) => {
+                        if (!valor && valor !== 0) return 0
+                        if (typeof valor === 'number') return valor
+                        const str = String(valor).trim().replace(',', '.')
+                        const num = parseFloat(str)
+                        return isNaN(num) ? 0 : num
+                      }
+                      
                       const totalCarrerasEntregadas = entregasEntregadas.reduce((sum, entrega) => {
-                        const montoBase = typeof entrega.precio === 'number'
-                          ? entrega.precio
-                          : parseFloat(entrega.precioBs || entrega.precio || 0)
-                        return sum + (isNaN(montoBase) ? 0 : montoBase)
+                        const montoBase = parsePrecio(entrega.precio ?? entrega.precioBs ?? 0)
+                        return sum + montoBase
                       }, 0)
                       const totalPagoEntregadas = entregasEntregadas.reduce((sum, entrega) => sum + (entrega.pagoBiker || 0), 0)
                       const totalCarrerasEfectivo = entregasEntregadas.reduce((sum, entrega) => {
                         const metodo = (entrega.metodoPago || '').toLowerCase()
                         if (metodo !== 'efectivo') return sum
-                        const monto = typeof entrega.precio === 'number'
-                          ? entrega.precio
-                          : parseFloat(entrega.precioBs || entrega.precio || 0)
-                        return sum + (isNaN(monto) ? 0 : monto)
+                        const monto = parsePrecio(entrega.precio ?? entrega.precioBs ?? 0)
+                        return sum + monto
                       }, 0)
                       const etiquetaTotal = filtroEfectivoActivo ? 'Total efectivo' : 'Total carreras'
                       const montoTotalMostrar = filtroEfectivoActivo ? totalCarrerasEfectivo : totalCarrerasEntregadas
@@ -6799,7 +6929,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                                 </td>
                                   <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: 700 }}>
                                     {(() => {
-                                      const precioValue = parseFloat(entrega.precio ?? entrega.precioBs ?? 0) || 0
+                                      // Helper para parsear precios que pueden venir con coma como separador decimal
+                                      const parsePrecio = (valor) => {
+                                        if (!valor && valor !== 0) return 0
+                                        const str = String(valor).trim().replace(',', '.')
+                                        const num = parseFloat(str)
+                                        return isNaN(num) ? 0 : num
+                                      }
+                                      const precioValue = parsePrecio(entrega.precio ?? entrega.precioBs ?? 0)
                                       return `Bs${precioValue.toFixed(2)}`
                                     })()}
                                 </td>
@@ -6990,6 +7127,17 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                     setMissingDataModal({ show: false, order: null })
                     setActiveTab('agregar')
                   }}
+      />
+      
+      {/* Modal de Información Adicional (uses hook state now) */}
+      <InfoAdicionalModal
+        isOpen={addressInfoModalState.show}
+        onClose={closeAddressInfoModal}
+        onAccept={addressInfoModalState.onAccept}
+        onCancel={addressInfoModalState.onCancel}
+        textoAnterior={addressInfoModalState.textoAnterior}
+        textoNuevo={addressInfoModalState.textoNuevo}
+        tipo={addressInfoModalState.tipo}
       />
       
       {/* Modal de Entrega */}
@@ -8015,7 +8163,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             backgroundColor: 'var(--accent)',
             color: 'white',
             border: 'none',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)',
+            boxShadow: '0 4px 12px rgba(251, 191, 36, 0.4)', /* Sombra actualizada para amarillo aclarado */
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -8025,11 +8173,11 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)'
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.6)'
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(251, 191, 36, 0.6)' /* Sombra actualizada */
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.4)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.4)' /* Sombra actualizada */
           }}
           title="Timer / Recordatorio"
         >

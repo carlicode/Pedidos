@@ -45,6 +45,9 @@ export function useKanban(orders, setOrders, logToCSV, showNotification, setMiss
         ...additionalData
       }
       
+      console.log('🔍 [Kanban] Pedido antes de actualizar:', { id: currentOrder.id, fecha: currentOrder.fecha, estado: currentOrder.estado })
+      console.log('🔍 [Kanban] Pedido después de actualizar:', { id: updatedOrder.id, fecha: updatedOrder.fecha, estado: updatedOrder.estado })
+      
       // Actualizar estado localmente primero
       setOrders(prevOrders => 
         prevOrders.map(order => 

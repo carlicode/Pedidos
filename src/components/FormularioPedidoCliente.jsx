@@ -491,7 +491,7 @@ export default function FormularioPedidoCliente({
                   style={{
                     padding: '10px 20px',
                     fontSize: '14px',
-                    background: calculandoDistancia ? '#fde47c' : 'var(--yellow)',
+                    background: calculandoDistancia ? 'var(--yellow)' : 'var(--yellow)', /* Amarillo unificado */
                     color: '#1f2933',
                     border: 'none',
                     borderRadius: '8px',

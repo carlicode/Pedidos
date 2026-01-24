@@ -249,10 +249,18 @@ export const calcularCuentasBiker = (orders, bikersList, opciones = {}) => {
       return null // No incluir bikers sin pedidos en el rango
     }
     
+    // Helper para parsear precios que pueden venir con coma como separador decimal
+    const parsePrecio = (valor) => {
+      if (!valor && valor !== 0) return 0
+      const str = String(valor).trim().replace(',', '.')
+      const num = parseFloat(str)
+      return isNaN(num) ? 0 : num
+    }
+    
     // Calcular totales
     const totalEntregas = pedidosBiker.length
     const totalCarreras = pedidosBiker.reduce((sum, pedido) => {
-      const precio = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+      const precio = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
       return sum + precio
     }, 0)
     
@@ -263,18 +271,21 @@ export const calcularCuentasBiker = (orders, bikersList, opciones = {}) => {
       if (metodoPago === 'A cuenta') {
         return sum
       }
-      const precio = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+      const precio = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
       return sum + precio
     }, 0)
     
-    // El pago del biker es el 70% del total de carreras PAGABLES
-    const pagoBiker = totalCarrerasPagables * 0.7
+    // El pago del biker es el total de carreras PAGABLES (excluyendo "A cuenta")
+    // NO se aplica porcentaje, se usa el precio total completo
+    const pagoBiker = totalCarrerasPagables
     
     // Crear detalle de entregas
     const entregas = pedidosBiker.map(pedido => {
-      const precioCarrera = parseFloat(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
+      const precioCarrera = parsePrecio(pedido['Precio [Bs]'] || pedido.precio_bs || pedido.precio || 0)
       const metodoPago = pedido['Método pago pago'] || pedido.metodo_pago || 'Efectivo'
-      const pagoBikerIndividual = metodoPago === 'A cuenta' ? 0 : precioCarrera * 0.7
+      // Para carreras "A cuenta", el pago al biker es 0
+      // Para otras carreras, usar el precio total completo (NO aplicar porcentaje)
+      const pagoBikerIndividual = metodoPago === 'A cuenta' ? 0 : precioCarrera
       
       return {
         id: pedido.id || pedido.ID,

@@ -63,16 +63,20 @@ function normalizeDateToDDMMYYYY(dateString) {
       }
     }
     
+    // Si viene con días/meses de un solo dígito (D/M/YYYY, D/MM/YYYY, DD/M/YYYY)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
+      const [day, month, year] = trimmed.split('/')
+      const paddedDay = day.padStart(2, '0')
+      const paddedMonth = month.padStart(2, '0')
+      return `${paddedDay}/${paddedMonth}/${year}`
+    }
+    
     // Si viene en formato YYYY-MM-DD, convertir a DD/MM/YYYY
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
       const parts = trimmed.split('-')
       const year = parts[0]
       const month = parts[1]
       const day = parts[2]
-      
-      console.log(`📅 Normalizando fecha YYYY-MM-DD: "${trimmed}"`)
-      console.log(`   - year: ${year}, month: ${month}, day: ${day}`)
-      console.log(`   - Resultado: ${day}/${month}/${year}`)
       
       // Retornar directamente sin validación (para evitar problemas de zona horaria)
       return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
@@ -106,7 +110,6 @@ function normalizeDateToDDMMYYYY(dateString) {
       if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
         const dayStr = String(day).padStart(2, '0')
         const monthStr = String(month).padStart(2, '0')
-        console.log(`📅 Normalizando fecha con regex flexible: "${trimmed}" -> ${dayStr}/${monthStr}/${year}`)
         return `${dayStr}/${monthStr}/${year}`
       }
     }
@@ -190,8 +193,9 @@ const HISTORIAL_SHEET_NAME = process.env.HISTORIAL_SHEET_NAME || 'Historial de p
 const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || ''
 const SERVICE_ACCOUNT_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '/Users/carli.code/Desktop/Pedidos/beezero-62dea82962da.json'
 
-// API Key de Google Maps - debe estar configurada en variables de entorno
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY
+// API Key de Google Maps y credenciales - se cargarán desde AWS Secrets Manager
+let GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || null
+let SERVICE_ACCOUNT_CREDENTIALS = null
 
 // Debug: Mostrar todas las variables de entorno cargadas
 console.log('🔍 Variables de entorno cargadas:')
@@ -223,9 +227,42 @@ import authRoutes from './routes/auth.js'
 import clientRoutes from './routes/client.js'
 import notesRoutes from './routes/notes.js'
 
+// Importar funciones para obtener secretos de AWS
+import { getSecrets } from './utils/secrets.js'
+
 // Importar sistema de logging
 import logger, { logSystem } from './utils/logger.js'
 import { requestLogger, errorLogger } from './middleware/logging.js'
+
+/**
+ * Inicializa los secretos desde AWS Secrets Manager
+ * Si falla, usa variables de entorno locales como fallback
+ */
+async function initializeSecrets() {
+  try {
+    console.log('🔐 Cargando secretos desde AWS Secrets Manager...')
+    const secrets = await getSecrets()
+    
+    // Actualizar las variables globales con los secretos de AWS
+    if (secrets.GOOGLE_MAPS_API_KEY) {
+      GOOGLE_MAPS_API_KEY = secrets.GOOGLE_MAPS_API_KEY
+    }
+    
+    if (secrets.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      SERVICE_ACCOUNT_CREDENTIALS = JSON.parse(secrets.GOOGLE_SERVICE_ACCOUNT_JSON)
+    }
+    
+    console.log('✅ Secretos cargados exitosamente desde AWS Secrets Manager')
+  } catch (error) {
+    console.error('❌ Error cargando secretos de AWS:', error.message)
+    console.log('⚠️  Usando variables de entorno locales como fallback...')
+    
+    // Fallback: mantener valores de variables de entorno
+    if (!GOOGLE_MAPS_API_KEY) {
+      GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY
+    }
+  }
+}
 
 // Middleware de logging global (antes de las rutas)
 app.use(requestLogger)
@@ -244,10 +281,18 @@ function getAuthClient() {
   
   console.log('🔐 Intentando autenticación con Google Sheets...')
   
-  if (SERVICE_ACCOUNT_JSON) {
+  // Prioridad 1: Credenciales cargadas desde AWS Secrets Manager
+  if (SERVICE_ACCOUNT_CREDENTIALS) {
+    console.log('  - Usando credenciales desde AWS Secrets Manager')
+    creds = SERVICE_ACCOUNT_CREDENTIALS
+  }
+  // Prioridad 2: JSON directo desde variable de entorno
+  else if (SERVICE_ACCOUNT_JSON) {
     console.log('  - Usando SERVICE_ACCOUNT_JSON')
     creds = JSON.parse(SERVICE_ACCOUNT_JSON)
-  } else if (SERVICE_ACCOUNT_FILE) {
+  }
+  // Prioridad 3: Archivo local (fallback para desarrollo)
+  else if (SERVICE_ACCOUNT_FILE) {
     console.log(`  - Usando SERVICE_ACCOUNT_FILE: ${SERVICE_ACCOUNT_FILE}`)
     try {
       // Resolver la ruta del archivo de service account
@@ -379,12 +424,46 @@ const KEY_TO_COL = {
 function buildRow(order) {
   const row = HEADER_ORDER.map(() => '')
   console.log('🔍 Mapeando campos del pedido:')
+  console.log('🔍 Estado recibido:', order.Estado, '| estado:', order.estado)
   
-  // El frontend ya envía los datos con los nombres de las columnas del Google Sheet
-  // Por lo tanto, podemos mapear directamente usando HEADER_ORDER
-  for (let i = 0; i < HEADER_ORDER.length; i++) {
-    const columnName = HEADER_ORDER[i]
-    let value = order[columnName] ?? ''
+    // El frontend ya envía los datos con los nombres de las columnas del Google Sheet
+    // Por lo tanto, podemos mapear directamente usando HEADER_ORDER
+    // PERO también aceptar nombres en minúsculas para compatibilidad
+    for (let i = 0; i < HEADER_ORDER.length; i++) {
+      const columnName = HEADER_ORDER[i]
+      let value = order[columnName] ?? ''
+      
+      // Mapear nombres de columnas a posibles variantes del frontend
+      if (!value) {
+        if (columnName === 'Recojo' && order.recojo) {
+          value = order.recojo
+        } else if (columnName === 'Entrega' && order.entrega) {
+          value = order.entrega
+        } else if (columnName === 'Cliente' && order.cliente) {
+          value = order.cliente
+        } else if (columnName === 'Operador' && order.operador) {
+          value = order.operador
+        }
+      }
+    
+    // Mapear campos con nombres en minúsculas (desde frontend) a nombres de columnas (Sheet)
+    if (columnName === 'Estado' && !value && order.estado) {
+      value = order.estado
+      console.log('✅ Usando order.estado para Estado:', value)
+    }
+    if (columnName === 'Estado de pago' && !value && order.estado_pago) {
+      value = order.estado_pago
+    }
+    if (columnName === 'Hora Ini' && !value && order.hora_ini) {
+      value = order.hora_ini
+    }
+    if (columnName === 'Hora Fin' && !value && order.hora_fin) {
+      value = order.hora_fin
+      console.log('✅ Usando order.hora_fin para Hora Fin:', value)
+    }
+    if (columnName === 'Duracion' && !value && order.duracion) {
+      value = order.duracion
+    }
     
     // Establecer valores por defecto para Estado y Estado de pago
     if (columnName === 'Estado' && !value) {
@@ -842,19 +921,82 @@ const expandUrlAndExtractCoords = async (shortUrl) => {
               console.log('⚠️ Error al re-expandir URL:', reExpandError.message)
             }
             
-            // Si re-expansión no funcionó, intentar geocoding
-            console.log('🔄 Intentando geocoding como último recurso...')
-            try {
-              const geocodedCoords = await geocodeLocation(newExpandedUrl)
-              if (geocodedCoords && !geocodedCoords.includes('http')) {
-                console.log('✅ Coordenadas obtenidas por geocoding de URL problemática:', geocodedCoords)
-                return geocodedCoords
-              }
-            } catch (geocodeError) {
-              console.log('⚠️ Geocoding de URL problemática falló:', geocodeError.message)
+            // Si re-expansión no funcionó, intentar múltiples estrategias
+            console.log('🔄 Intentando múltiples estrategias para URL problemática...')
+            
+            // ESTRATEGIA 1: Intentar usar la URL corta original si está disponible
+            if (originalUrl && (originalUrl.includes('goo.gl') || originalUrl.includes('maps.app.goo.gl'))) {
+              console.log('🔄 Intentando usar URL corta original:', originalUrl)
+              // La URL corta puede funcionar mejor con Distance Matrix
+              return originalUrl.trim()
             }
             
-            // Si todo falla, usar la URL expandida original
+            // ESTRATEGIA 2: Intentar extraer nombre del lugar de la URL si está disponible
+            // Algunas URLs tienen el nombre del lugar en el path: /place/NombreDelLugar/
+            const placeNameMatch = newExpandedUrl.match(/\/place\/([^\/\?]+)/)
+            if (placeNameMatch && placeNameMatch[1] && placeNameMatch[1] !== '') {
+              const placeName = decodeURIComponent(placeNameMatch[1].replace(/\+/g, ' '))
+              console.log('📍 Nombre del lugar extraído:', placeName)
+              try {
+                const geocodedCoords = await geocodeLocation(placeName)
+                if (geocodedCoords && !geocodedCoords.includes('http')) {
+                  console.log('✅ Coordenadas obtenidas por geocoding del nombre del lugar:', geocodedCoords)
+                  return geocodedCoords
+                }
+              } catch (placeNameError) {
+                console.log('⚠️ Geocoding del nombre del lugar falló:', placeNameError.message)
+              }
+            }
+            
+            // ESTRATEGIA 3: Intentar construir URL válida limpiando el formato problemático
+            try {
+              // Remover el doble slash y construir URL válida
+              let cleanUrl = newExpandedUrl.replace(/\/place\/\/+/g, '/place/')
+              // Si tiene data= con Place ID, intentar construir URL más simple
+              const placeIdMatch = newExpandedUrl.match(/data=!4m2!3m1!1s([^!]+)/)
+              if (placeIdMatch && placeIdMatch[1]) {
+                // El Place ID puede estar en formato 0x...:0x... o ChIJ...
+                const placeId = placeIdMatch[1]
+                console.log('📍 Place ID encontrado en data:', placeId)
+                
+                // Si es un Place ID estándar (ChIJ...), intentar geocoding directo
+                if (placeId.startsWith('ChIJ') || placeId.startsWith('Ei')) {
+                  try {
+                    const apiKey = GOOGLE_MAPS_API_KEY
+                    if (apiKey) {
+                      const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${encodeURIComponent(placeId)}&key=${apiKey}`
+                      const geocodeResponse = await fetch(geocodingUrl)
+                      const geocodeData = await geocodeResponse.json()
+                      
+                      if (geocodeData.status === 'OK' && geocodeData.results && geocodeData.results.length > 0) {
+                        const location = geocodeData.results[0].geometry.location
+                        const coords = `${location.lat},${location.lng}`
+                        console.log('✅ Coordenadas obtenidas por geocoding con Place ID estándar:', coords)
+                        return coords
+                      }
+                    }
+                  } catch (placeIdError) {
+                    console.log('⚠️ Geocoding con Place ID estándar falló:', placeIdError.message)
+                  }
+                }
+              }
+              
+              // Limpiar URL y usar directamente
+              cleanUrl = cleanUrl.split('?')[0].split('#')[0]
+              cleanUrl = cleanUrl.replace(/\/\/+/g, '/')
+              console.log('🔄 Usando URL limpia construida:', cleanUrl)
+              return cleanUrl
+            } catch (cleanError) {
+              console.log('⚠️ Limpieza de URL falló:', cleanError.message)
+            }
+            
+            // ESTRATEGIA 4: Si todo falla, priorizar URL corta original sobre URL expandida problemática
+            if (originalUrl && (originalUrl.includes('goo.gl') || originalUrl.includes('maps.app.goo.gl'))) {
+              console.log('🔄 Usando URL corta original (mejor que URL expandida problemática):', originalUrl)
+              return originalUrl.trim()
+            }
+            
+            // Último recurso: usar URL expandida (aunque sea problemática)
             console.log('🔄 Usando URL expandida original (Distance Matrix puede intentar procesarla):', newExpandedUrl)
             return newExpandedUrl
           }
@@ -1145,12 +1287,20 @@ const expandUrlAndExtractCoords = async (shortUrl) => {
     
     // Si no encontramos coordenadas y tenemos una URL corta original guardada, intentar usarla directamente
     // La Distance Matrix API puede procesar URLs cortas de goo.gl directamente
+    // PRIORIZAR URL CORTA sobre URL expandida problemática
     if (typeof originalUrl !== 'undefined' && originalUrl && 
-        (originalUrl.includes('goo.gl') || originalUrl.includes('maps.app.goo.gl')) &&
-        (shortUrl.includes('/place//') || shortUrl.includes('data=') || !shortUrl.includes('goo.gl'))) {
-      console.log('🔄 No se pudieron extraer coordenadas de URL expandida, intentando usar URL corta original directamente...')
-      console.log('📍 URL corta original:', originalUrl)
-      return originalUrl.trim()
+        (originalUrl.includes('goo.gl') || originalUrl.includes('maps.app.goo.gl'))) {
+      // Si la URL expandida tiene problemas O no tiene coordenadas, usar la corta original
+      const hasProblematicFormat = shortUrl.includes('/place//') || 
+                                   shortUrl.includes('data=') || 
+                                   shortUrl.includes('/place//data=')
+      const hasNoCoords = !shortUrl.match(/-?\d+\.\d+,-?\d+\.\d+/)
+      
+      if (hasProblematicFormat || hasNoCoords || !shortUrl.includes('goo.gl')) {
+        console.log('🔄 URL expandida problemática o sin coordenadas, usando URL corta original directamente...')
+        console.log('📍 URL corta original:', originalUrl)
+        return originalUrl.trim()
+      }
     }
     
     // Si no encontramos coordenadas, intentar geocoding como respaldo (solo si no es una URL)
@@ -1166,8 +1316,14 @@ const expandUrlAndExtractCoords = async (shortUrl) => {
       }
     }
     
-    // Si todo falla, usar la ubicación original
-    console.log('📍 Usando ubicación original:', shortUrl)
+    // Si todo falla, priorizar URL corta original sobre URL expandida problemática
+    if (originalUrl && (originalUrl.includes('goo.gl') || originalUrl.includes('maps.app.goo.gl'))) {
+      console.log('📍 Usando URL corta original (fallback final):', originalUrl)
+      return originalUrl.trim()
+    }
+    
+    // Último recurso: usar la ubicación procesada
+    console.log('📍 Usando ubicación procesada:', shortUrl)
     return shortUrl
   } catch (error) {
     console.error('❌ Error expandiendo URL:', error)
@@ -1424,14 +1580,17 @@ app.post('/api/orders', async (req, res) => {
     let existingRowIndex = -1
     let duplicateCount = 0
     
-    console.log('🔍 Buscando pedido existente con ID:', order.id, 'Tipo:', typeof order.id)
-    console.log('📋 IDs encontrados en el sheet:', ids.map((row, index) => ({ row: index, id: row[0], type: typeof row[0] })))
+    // Normalizar: aceptar tanto 'id' como 'ID'
+    const orderId = order.id || order.ID || order['ID']
+    
+    console.log('🔍 Buscando pedido existente con ID:', orderId, 'Tipo:', typeof orderId)
+    console.log('🔍 order.id:', order.id, '| order.ID:', order.ID)
     
     // Verificar si el ID ya existe y contar duplicados
     for (let i = 1; i < ids.length; i++) { // Saltar header (i=0)
       const sheetId = ids[i] && ids[i][0]
       
-      if (ids[i] && String(sheetId) === String(order.id)) {
+      if (ids[i] && String(sheetId) === String(orderId)) {
         if (existingRowIndex === -1) {
           existingRowIndex = i + 1 // +1 porque las filas de Google Sheets empiezan en 1
           console.log(`✅ Encontrado pedido existente en fila ${existingRowIndex}`)
@@ -1442,7 +1601,7 @@ app.post('/api/orders', async (req, res) => {
     
     // Si hay duplicados pero no es una actualización, generar nuevo ID
     if (duplicateCount > 0 && existingRowIndex === -1) {
-      console.log(`⚠️ ID ${order.id} ya existe ${duplicateCount} veces, generando nuevo ID...`)
+      console.log(`⚠️ ID ${orderId} ya existe ${duplicateCount} veces, generando nuevo ID...`)
       
       // Calcular nuevo ID basado en el máximo existente
       const numericIds = ids.slice(1).map(row => {
@@ -1451,8 +1610,10 @@ app.post('/api/orders', async (req, res) => {
       }).filter(id => id > 0)
       
       const newId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1
+      // Actualizar tanto order.id como order.ID
       order.id = newId.toString()
-      console.log(`🆕 Nuevo ID asignado: ${order.id}`)
+      order.ID = newId.toString()
+      console.log(`🆕 Nuevo ID asignado: ${newId}`)
     }
     
     if (existingRowIndex === -1) {
@@ -1473,7 +1634,7 @@ app.post('/api/orders', async (req, res) => {
         valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
         requestBody: { values: [row] }
       })
-      console.log(`Updated existing order #${order.id} at row ${existingRowIndex}`)
+      console.log(`✅ Updated existing order #${orderId} at row ${existingRowIndex}`)
     } else {
       // Agregar nueva fila
       // HEADER_ORDER tiene 31 columnas (A hasta AE)
@@ -1484,7 +1645,7 @@ app.post('/api/orders', async (req, res) => {
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [row] }
       })
-      console.log(`Added new order #${order.id}`)
+      console.log(`✅ Added new order #${orderId}`)
     }
 
     res.json({ ok: true, updated: existingRowIndex > 0 })
@@ -1505,6 +1666,13 @@ app.put('/api/orders/:id', async (req, res) => {
   try {
     const orderId = req.params.id
     const order = req.body || {}
+    
+    console.log('📥 [PUT /api/orders/:id] Datos recibidos:', {
+      orderId,
+      recojo: order.Recojo || order.recojo,
+      entrega: order.Entrega || order.entrega,
+      estado: order.Estado || order.estado
+    })
     
     if (!orderId) {
       return res.status(400).json({ 
@@ -1569,25 +1737,44 @@ app.put('/api/orders/:id', async (req, res) => {
       })
     }
     
-    // Usar la MISMA función buildRow que POST para garantizar consistencia
-    const row = buildRow(order)
+    // LEER LA FILA EXISTENTE primero para preservar datos que no se envían
+    const existingRowResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${quoted}!A${rowIndex}:AE${rowIndex}`
+    })
+    
+    const existingRow = (existingRowResponse.data.values && existingRowResponse.data.values[0]) || []
+    
+    // Construir nueva fila con buildRow
+    const newRow = buildRow(order)
+    
+    // Mezclar: mantener valores existentes si los nuevos están vacíos
+    // Solo sobrescribir si el nuevo valor NO está vacío O si es un campo que queremos limpiar intencionalmente
+    const mergedRow = newRow.map((newValue, index) => {
+      const columnName = HEADER_ORDER[index]
+      const existingValue = existingRow[index] || ''
+      
+      // Campos que SÍ queremos poder vaciar intencionalmente (no preservar)
+      const canBeEmptied = ['Observaciones', 'Detalles de la Carrera', 'Hora Fin', 'Duracion', 'Tiempo de espera']
+      
+      // Si el nuevo valor está vacío Y no es un campo que se puede vaciar, mantener el existente
+      if (!newValue && !canBeEmptied.includes(columnName) && existingValue) {
+        return existingValue
+      }
+      
+      // Si hay un nuevo valor O es un campo que se puede vaciar, usar el nuevo
+      return newValue
+    })
     
     // HEADER_ORDER tiene 31 columnas (A hasta AE)
-    // Asegurar que el rango coincida exactamente con el número de columnas
-    // AE es la columna 31 (A=1, B=2, ..., Z=26, AA=27, AB=28, AC=29, AD=30, AE=31)
     const lastColumn = 'AE'
     
-    // Verificar que el row tenga exactamente 31 elementos
-    if (row.length !== HEADER_ORDER.length) {
-      console.warn(`⚠️ Advertencia: row.length (${row.length}) no coincide con HEADER_ORDER.length (${HEADER_ORDER.length})`)
-    }
-    
-    // Actualizar la fila en el sheet
+    // Actualizar la fila en el sheet con la fila mezclada
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: `${quoted}!A${rowIndex}:${lastColumn}${rowIndex}`,
       valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
-      requestBody: { values: [row] }
+      requestBody: { values: [mergedRow] }
     })
     
     console.log(`✅ Pedido #${orderId} actualizado exitosamente en fila ${rowIndex}`)
@@ -5078,14 +5265,19 @@ app.use((err, req, res, next) => {
   })
 })
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 API listening on:`)
-  console.log(`   - Local:   http://localhost:${PORT}`)
-  console.log(`   - Network: http://0.0.0.0:${PORT}`)
-  console.log(`💡 Para acceder desde otros dispositivos en la red, usa tu IP local`)
+// Inicializar secretos y luego iniciar el servidor
+;(async () => {
+  await initializeSecrets()
   
-  // Log del inicio del servidor
-  logSystem.startup(PORT)
-})
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 API listening on:`)
+    console.log(`   - Local:   http://localhost:${PORT}`)
+    console.log(`   - Network: http://0.0.0.0:${PORT}`)
+    console.log(`💡 Para acceder desde otros dispositivos en la red, usa tu IP local`)
+    
+    // Log del inicio del servidor
+    logSystem.startup(PORT)
+  })
+})()
 
 

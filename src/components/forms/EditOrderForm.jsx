@@ -3,10 +3,15 @@ import { cleanGoogleMapsUrl } from '../../utils/mapsUtils.js'
 import { calculatePrice } from '../../utils/priceCalculator.js'
 import { calculateDistance } from '../../utils/distanceCalculator.js'
 import { getEmpresaMapa } from '../../utils/dataHelpers.js'
+import useOrderForm from '../../hooks/useOrderForm.js'
+import useAddressAutofill from '../../hooks/useAddressAutofill.js'
+import usePriceCalculation from '../../hooks/usePriceCalculation.js'
+import useDistanceCalculation from '../../hooks/useDistanceCalculation.js'
 
 const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, showNotification, empresas, currentOperador }) => {
-  const [editData, setEditData] = useState({
-    operador: currentOperador || order.operador || '', // Usar siempre el operador actual
+  // Use custom hooks for form management (REFACTORED)
+  const initialOrderData = {
+    operador: currentOperador || order.operador || '',
     cliente: order.cliente || '',
     recojo: order.recojo || '',
     entrega: order.entrega || '',
@@ -34,67 +39,61 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
     cobro_pago: order.cobro_pago || '',
     monto_cobro_pago: order.monto_cobro_pago || '',
     descripcion_cobro_pago: order.descripcion_cobro_pago || ''
-  })
+  }
   
-  const [precioEditadoManualmente, setPrecioEditadoManualmente] = useState(false)
+  const { form: editData, setForm: setEditData, updateFields } = useOrderForm(initialOrderData)
+  
+  // Price calculation hook
+  const {
+    precioEditadoManualmente,
+    setPrecioEditadoManualmente,
+    calculatePriceFromDistance,
+    handlePrecioManualEdit,
+    calculateAndUpdatePrice
+  } = usePriceCalculation(editData, { showNotification })
+  
+  // Distance calculation hook (uses the wrapper provided)
+  const {
+    isCalculating: isCalculatingDistance,
+    calculateDistanceBetween
+  } = useDistanceCalculation({ showNotification })
+  
+  // Note: EditOrderForm doesn't use InfoAdicionalModal directly
+  // That's handled by the parent Orders.jsx when creating orders
+  // For editing, we keep it simpler - just update the fields directly
   
   // Función para intercambiar recojo y entrega en el formulario de edición
   const swapRecojoEntregaEdit = async () => {
-    setEditData(prev => {
       const newData = {
-        ...prev,
-        // Intercambiar direcciones
-        direccion_recojo: prev.direccion_entrega,
-        direccion_entrega: prev.direccion_recojo,
-        // Intercambiar info adicional
-        info_direccion_recojo: prev.info_direccion_entrega,
-        info_direccion_entrega: prev.info_direccion_recojo,
-        // Intercambiar nombres
-        recojo: prev.entrega,
-        entrega: prev.recojo
+      direccion_recojo: editData.direccion_entrega,
+      direccion_entrega: editData.direccion_recojo,
+      info_direccion_recojo: editData.info_direccion_entrega,
+      info_direccion_entrega: editData.info_direccion_recojo,
+      recojo: editData.entrega,
+      entrega: editData.recojo
       }
+    
+    updateFields(newData)
       
       // Recalcular distancia automáticamente después del intercambio si hay direcciones válidas
       if (newData.direccion_recojo && newData.direccion_entrega && 
           newData.direccion_recojo.includes('maps') && newData.direccion_entrega.includes('maps')) {
         setTimeout(() => {
-          calculateDistanceAndPriceEdit(newData.direccion_recojo, newData.direccion_entrega, newData.medio_transporte)
+        calculateDistanceAndPriceEdit(newData.direccion_recojo, newData.direccion_entrega, editData.medio_transporte)
         }, 100)
       }
       
-      return newData
-    })
     showNotification('🔄 Recojo y Entrega intercambiados', 'success')
   }
   
   // Función personalizada para calcular distancia y precio en el formulario de edición
   const calculateDistanceAndPriceEdit = async (direccionRecojo, direccionEntrega, medioTransporte) => {
-    // Validar que las direcciones no estén vacías y sean URLs válidas
-    if (!direccionRecojo || !direccionEntrega) {
-      showNotification('⚠️ Por favor ingresa ambas direcciones (recojo y entrega)', 'warning')
-      return
-    }
-    
-    // Limpiar URLs antes de validar
+    // Use the provided wrapper since it has special logic
     const cleanRecojo = cleanGoogleMapsUrl(direccionRecojo)
     const cleanEntrega = cleanGoogleMapsUrl(direccionEntrega)
     
-    // Validar que sean URLs de Google Maps válidas
-    const isValidMapsUrl = (url) => {
-      if (!url || typeof url !== 'string') return false
-      return url.includes('maps.app.goo.gl') || 
-             url.includes('goo.gl/maps') || 
-             url.includes('google.com/maps') || 
-             url.includes('maps.google.com')
-    }
-    
-    if (!isValidMapsUrl(cleanRecojo)) {
-      showNotification('⚠️ La dirección de recojo debe ser un enlace válido de Google Maps', 'warning')
-      return
-    }
-    
-    if (!isValidMapsUrl(cleanEntrega)) {
-      showNotification('⚠️ La dirección de entrega debe ser un enlace válido de Google Maps', 'warning')
+    if (!cleanRecojo || !cleanEntrega) {
+      showNotification('⚠️ Por favor ingresa ambas direcciones (recojo y entrega)', 'warning')
       return
     }
 
@@ -103,39 +102,24 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
       const distance = await calculateDistanceWrapper(cleanRecojo, cleanEntrega)
       
       if (distance !== null && distance > 0) {
-        // Actualizar distancia en el estado local
-        setEditData(prev => ({ ...prev, distancia_km: distance }))
-        
-        // Calcular precio si tenemos medio de transporte
+        // Calculate price if we have transport type
         if (medioTransporte && medioTransporte.trim() !== '') {
-          // Verificar si el método de pago actual es Cuenta
           const metodoPagoActual = editData.metodo_pago || 'Efectivo'
-          
-          // Siempre calcular el precio para guardarlo en el sheet
           const precio = calculatePrice(distance, medioTransporte)
           
+          updateFields({ 
+            distancia_km: distance,
+            precio_bs: precio 
+          })
+          
           if (metodoPagoActual === 'Cuenta') {
-            // Para "Cuenta", guardar el precio calculado pero mostrar "Cuenta del cliente"
-            setEditData(prev => ({ 
-              ...prev, 
-              distancia_km: distance,
-              precio_bs: precio // Guardar el precio real en el sheet
-            }))
             showNotification(`📏 Distancia: ${distance} km • 💳 Precio calculado: ${precio} Bs (Cuenta del cliente)`, 'success')
           } else {
-            setEditData(prev => ({ 
-              ...prev, 
-              distancia_km: distance,
-              precio_bs: precio 
-            }))
             showNotification(`📏 Distancia: ${distance} km • 💰 Precio: ${precio} Bs`, 'success')
           }
         } else {
-          // Solo actualizar distancia
-          setEditData(prev => ({ 
-            ...prev, 
-            distancia_km: distance
-          }))
+          // Only update distance
+          updateFields({ distancia_km: distance })
           showNotification(`📏 Distancia calculada: ${distance} km`, 'success')
         }
       } else {
@@ -165,13 +149,10 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
       updatedData.direccion_entrega = empresaMapa
     }
     
-    // Detectar cuando el usuario edita manualmente el precio
+    // Detectar cuando el usuario edita manualmente el precio (REFACTORED)
     if (name === 'precio_bs') {
-      setPrecioEditadoManualmente(true)
-      // Si es modo "Cuenta", mostrar notificación especial
-      if (editData.metodo_pago === 'Cuenta') {
-        showNotification('✏️ Precio editado manualmente (Cuenta del cliente)', 'info')
-      }
+      handlePrecioManualEdit(value, setEditData, editData.metodo_pago)
+      return
     }
     
     // Limpiar monto si se deselecciona cobro/pago
@@ -180,7 +161,7 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
     }
     
     // Actualizar el formulario - SIN auto-cálculos
-    setEditData(prev => ({ ...prev, ...updatedData }))
+    updateFields(updatedData)
   }
 
   // Actualizar datos cuando cambie el order
@@ -339,7 +320,7 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
                   rel="noopener noreferrer" 
                   title="Ver en Maps"
                   style={{
-                    backgroundColor: '#ff9800',
+                    backgroundColor: '#fbbf24', /* Amarillo-naranja claro unificado (aclarado) */
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',
@@ -435,7 +416,7 @@ const EditOrderForm = ({ order, onComplete, onCancel, calculateDistanceWrapper, 
                   rel="noopener noreferrer" 
                   title="Ver en Maps"
                   style={{
-                    backgroundColor: '#ff9800',
+                    backgroundColor: '#fbbf24', /* Amarillo-naranja claro unificado (aclarado) */
                     color: 'white',
                     border: 'none',
                     borderRadius: '6px',

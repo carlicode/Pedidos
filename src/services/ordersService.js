@@ -162,6 +162,14 @@ export const filterOrderForSheet = (order) => {
   // Usar los valores de fecha y hora que ya vienen formateados del pedido
   const currentDate = order.fecha_registro || ''
   const currentTime = order.hora_registro || ''
+  
+  console.log('🔍 [filterOrderForSheet] Checking:', { 
+    id: order.id, 
+    fecha_registro: order.fecha_registro, 
+    hora_registro: order.hora_registro,
+    currentDate,
+    currentTime
+  })
 
   // Función auxiliar para detectar mapas válidos
   const hasValidMapsLink = (direccion) => {
@@ -237,13 +245,18 @@ export const filterOrderForSheet = (order) => {
  * @throws {Error} Si falla al guardar
  */
 export const saveOrderToSheet = async (order, silent = false, SHEET_URL, SHEET_TOKEN) => {
+  console.log('🔍 [saveOrderToSheet] Iniciando guardado:', { SHEET_URL, orderId: order.id })
+  
   if (!SHEET_URL) {
+    console.error('❌ [saveOrderToSheet] SHEET_URL no configurada')
     throw new Error('URL del servidor no configurada')
   }
   
   // Filtrar solo los campos que van al Google Sheet
   const filteredOrder = filterOrderForSheet(order)
+  console.log('📋 [saveOrderToSheet] Orden filtrada:', filteredOrder)
 
+  console.log('🚀 [saveOrderToSheet] Enviando POST a:', SHEET_URL)
   const res = await fetch(SHEET_URL, {
     method: 'POST',
     headers: {
@@ -252,6 +265,7 @@ export const saveOrderToSheet = async (order, silent = false, SHEET_URL, SHEET_T
     },
     body: JSON.stringify(filteredOrder)
   })
+  console.log('✅ [saveOrderToSheet] Respuesta recibida:', res.status, res.statusText)
 
   if (res.ok) {
     const responseData = await res.json()

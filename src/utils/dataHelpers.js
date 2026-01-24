@@ -17,6 +17,17 @@ export const getEmpresaMapa = (nombreEmpresa, empresas = []) => {
 }
 
 /**
+ * Obtiene la descripción de una empresa
+ * @param {string} nombreEmpresa - Nombre de la empresa
+ * @param {Array} empresas - Array de empresas con estructura {empresa, mapa, descripcion}
+ * @returns {string} Descripción de la empresa o string vacío si no se encuentra
+ */
+export const getEmpresaDescripcion = (nombreEmpresa, empresas = []) => {
+  const empresa = empresas.find(e => e.empresa === nombreEmpresa)
+  return empresa ? (empresa.descripcion || '') : ''
+}
+
+/**
  * Obtiene la información de un cliente
  * @param {string} nombreCliente - Nombre del cliente
  * @param {Array} empresas - Array de empresas con estructura {empresa, descripcion}

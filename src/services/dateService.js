@@ -25,8 +25,13 @@ export const formatToStandardDate = (dateInput) => {
   if (!dateInput) return ''
   
   try {
-    const trimmed = String(dateInput).trim()
+    let trimmed = String(dateInput).trim()
     if (!trimmed) return ''
+    
+    // Remover comilla simple al inicio (Google Sheets a veces las agrega para forzar texto)
+    if (trimmed.startsWith("'")) {
+      trimmed = trimmed.substring(1).trim()
+    }
     
     // Ya está en formato DD/MM/YYYY - retornar tal cual
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
@@ -107,30 +112,79 @@ export const formatDateForDisplay = (dateString) => {
 }
 
 /**
- * Convierte una fecha DD/MM/YYYY a formato ISO YYYY-MM-DD
+ * Convierte una fecha a formato ISO YYYY-MM-DD
+ * Maneja múltiples formatos: DD/MM/YYYY, YYYY-MM-DD, números de Excel, etc.
  * Útil para filtros y comparaciones de fechas
  * 
- * @param {string} dateString - Fecha en formato DD/MM/YYYY
+ * @param {string|number} dateString - Fecha en cualquier formato
  * @returns {string} Fecha en formato YYYY-MM-DD o string vacío
  * 
  * @example
  * convertToISO('09/01/2026') // returns '2026-01-09'
+ * convertToISO('2026-01-09') // returns '2026-01-09'
+ * convertToISO("'09/01/2026") // returns '2026-01-09' (maneja comilla simple)
  */
 export const convertToISO = (dateString) => {
-  if (!dateString) return ''
+  if (!dateString && dateString !== 0) return ''
   
   try {
-    const trimmed = String(dateString).trim()
+    let trimmed = String(dateString).trim()
+    if (!trimmed) return ''
     
-    // Ya está en formato ISO
+    // Remover comillas simples al inicio y/o al final (Google Sheets a veces las agrega para forzar texto)
+    if (trimmed.startsWith("'")) {
+      trimmed = trimmed.substring(1)
+    }
+    if (trimmed.endsWith("'")) {
+      trimmed = trimmed.substring(0, trimmed.length - 1)
+    }
+    trimmed = trimmed.trim()
+    
+    // Ya está en formato ISO (YYYY-MM-DD)
     if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
       return trimmed.split('T')[0]
     }
     
-    // Formato DD/MM/YYYY - convertir a ISO
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    // Formato D/M/YYYY, DD/M/YYYY, D/MM/YYYY o DD/MM/YYYY - convertir a ISO
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
       const [day, month, year] = trimmed.split('/')
       return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+    
+    // Formato D-M-YYYY, DD-M-YYYY, D-MM-YYYY o DD-MM-YYYY - convertir a ISO
+    if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(trimmed)) {
+      const [day, month, year] = trimmed.split('-')
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+    
+    // Número de Excel (serial date) - convertir a ISO
+    const num = parseFloat(trimmed)
+    if (!isNaN(num) && !trimmed.includes('/') && !trimmed.includes('-') && num > 0) {
+      // Excel cuenta desde 1900-01-01, pero tiene un bug con 1900 siendo año bisiesto
+      const excelEpoch = new Date(1900, 0, 1)
+      const jsDate = new Date(excelEpoch.getTime() + (num - 1) * 24 * 60 * 60 * 1000)
+      if (!isNaN(jsDate.getTime())) {
+        const year = jsDate.getFullYear()
+        const month = String(jsDate.getMonth() + 1).padStart(2, '0')
+        const day = String(jsDate.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+    }
+    
+    // Intentar usar formatToStandardDate primero y luego convertir a ISO
+    const standardDate = formatToStandardDate(trimmed)
+    if (standardDate && /^\d{2}\/\d{2}\/\d{4}$/.test(standardDate)) {
+      const [day, month, year] = standardDate.split('/')
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+    
+    // Último recurso: intentar parsear como Date object
+    const date = new Date(trimmed)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
     }
     
     return ''

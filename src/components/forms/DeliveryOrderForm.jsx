@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import useOrderForm from '../../hooks/useOrderForm.js'
 
 const DeliveryOrderForm = ({ order, onComplete, onCancel }) => {
-  const [deliveryData, setDeliveryData] = useState({
+  // Use custom hook for consistent form management (REFACTORED)
+  const initialDeliveryData = {
     cliente: order.cliente || '',
     recojo: order.recojo || '',
     entrega: order.entrega || '',
@@ -12,7 +14,9 @@ const DeliveryOrderForm = ({ order, onComplete, onCancel }) => {
     hora_ini: order.hora_ini || '',
     hora_fin: '',
     observaciones: order.observaciones || ''
-  })
+  }
+  
+  const { form: deliveryData, setForm: setDeliveryData, handleInputChange } = useOrderForm(initialDeliveryData)
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -24,8 +28,7 @@ const DeliveryOrderForm = ({ order, onComplete, onCancel }) => {
   }
 
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setDeliveryData(prev => ({ ...prev, [name]: value }))
+    handleInputChange(e)
   }
 
   return (

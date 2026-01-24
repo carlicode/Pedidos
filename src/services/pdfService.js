@@ -544,7 +544,7 @@ export const generarPDFConHTML = async (datosFiltrados, fechaInicio, fechaFin, s
               <div class="summary-label">Cobros</div>
               <div class="summary-value">Bs${datosFiltrados.subtotalCobros.toFixed(2)}</div>
             </div>
-            <div class="summary-item" style="background: #fff3cd; border-color: #ffeaa7; color: #856404;">
+            <div class="summary-item" style="background: #fff3cd; border-color: #fbbf24; color: #856404;">
               <div class="summary-label">Carreras</div>
               <div class="summary-value">Bs${datosFiltrados.subtotalCarreras.toFixed(2)}</div>
             </div>

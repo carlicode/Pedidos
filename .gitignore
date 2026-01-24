@@ -30,6 +30,10 @@ beezero-*.json
 *.crt
 secret/
 credentials/
+secrets-backup.json
+
+# Backups
+*.backup
 
 # IDE
 .vscode/

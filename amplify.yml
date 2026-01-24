@@ -1,0 +1,37 @@
+version: 1
+
+# Configuración para AWS Amplify
+# Full-stack app: React frontend + Node.js backend
+
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+
+backend:
+  phases:
+    preBuild:
+      commands:
+        - cd server
+        - npm ci
+    build:
+      commands:
+        - echo "Backend build completed"
+  artifacts:
+    baseDirectory: server
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - server/node_modules/**/*

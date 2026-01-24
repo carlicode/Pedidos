@@ -1,263 +1,306 @@
-# 🐝 Beezy App
+# 🚀 Pedidos - Sistema de Gestión de Pedidos
 
-Sistema de gestión de pedidos y entregas para Beezy - Plataforma de delivery y logística.
+Sistema completo de gestión de pedidos con integración a Google Sheets, cálculo de distancias con Google Maps, y autenticación segura.
 
-## 📋 Descripción
+## 🌟 Características
 
-Beezy App es una aplicación web completa para gestionar pedidos, entregas, inventarios, cuentas de bikers y notas del equipo. El sistema permite crear, editar y rastrear pedidos, calcular distancias automáticamente usando Google Maps API, gestionar inventarios de empresas, y facilitar la comunicación entre operadores mediante notas.
+- ✅ Gestión completa de pedidos (Agregar, Editar, Cancelar, Entregar)
+- ✅ Integración con Google Sheets para almacenamiento
+- ✅ Cálculo automático de distancias y precios
+- ✅ Validación de direcciones con Google Maps
+- ✅ Sistema de notas del equipo
+- ✅ Gestión de inventarios
+- ✅ Horarios de bikers
+- ✅ Dashboard con kanban
+- ✅ Autenticación JWT segura
+- ✅ Logs profesionales con Winston
 
-## ✨ Características Principales
+## 🏗️ Stack Tecnológico
 
-### 🚚 Gestión de Pedidos
-- Creación, edición y duplicación de pedidos
-- Cálculo automático de distancias usando Google Maps
-- Validación automática de links de Google Maps
-- Cálculo automático de precios según distancia y medio de transporte
-- Gestión de estados de pedidos (Pendiente, En carrera, Entregado, Cancelado)
-- Vista Kanban para visualización de pedidos
-- Filtros por fecha (día, semana, mes, rango personalizado)
-- Exportación a PDF con plantillas personalizables
+### Frontend
+- React 18
+- Vite
+- React Router
+- Lucide React (iconos)
+- HTML2Canvas + jsPDF (reportes)
 
-### 💰 Cotización Rápida
-- Modal de cotización rápida con botón flotante
-- Cálculo instantáneo de distancia y precio
-- Validación automática de links de Google Maps
-- Llenado automático del formulario de pedido
-
-### 📝 Sistema de Notas del Equipo
-- Creación de notas para comunicación entre operadores
-- Marcar notas como resueltas con descripción de resolución
-- Filtros por estado (Todas, Pendientes, Resueltas)
-- Eliminación de notas (marcado como "Eliminado")
-- Burbuja flotante con contador de notas pendientes
-- Acceso rápido desde cualquier página del sistema
-
-### 📱 WhatsApp Integration
-- Generación automática de mensajes de WhatsApp
-- Formato estándar con información completa del pedido
-- Links directos de Google Maps incluidos
-- Información adicional de recogida y entrega
-
-### 📍 Validación de Links
-- Validación automática de links de Google Maps
-- Indicadores visuales (✅ válido, ❌ inválido)
-- Mensajes informativos sobre el estado del link
-
-### 🏢 Gestión de Empresas
-- Base de datos de empresas con direcciones predefinidas
-- Gestión de inventarios por empresa
-- Cuentas y pagos por empresa
-- Reportes de cobros y pagos
-
-### 🚴 Gestión de Bikers
-- Asignación de bikers a pedidos
-- Cuentas y pagos de bikers
-- Disponibilidad y horarios
-- Cálculo automático de cuentas pendientes
-
-### 📊 Dashboard
-- Estadísticas y métricas
-- Visualización de datos en tiempo real
-- Reportes personalizados
-
-### 👥 Sistema de Usuarios
-- Autenticación de usuarios
-- Roles: Admin, Operador, Cliente
-- Acceso diferenciado según rol
-- Clientes pueden ver solo sus pedidos e inventario
-
-## 🛠️ Tecnologías
-
-- **Frontend**: React 18, Vite
-- **Backend**: Node.js, Express
-- **Base de Datos**: Google Sheets API
-- **APIs Externas**: 
-  - Google Maps API (Distance Matrix, Directions, Geocoding, Places)
+### Backend
+- Node.js + Express
   - Google Sheets API
-- **Estilos**: CSS personalizado con soporte para dark mode
-- **PDF**: jsPDF, html2canvas para generación de reportes
-- **Notificaciones**: react-toastify
+- Google Maps API (Distance Matrix, Geocoding)
+- AWS DynamoDB (usuarios)
+- AWS Secrets Manager (credenciales)
+- Winston (logging)
 
-## 📦 Instalación
+## 📦 Instalación Local
 
-### Requisitos Previos
-- **Node.js**: v20.18.0 LTS (recomendado) o v18.x LTS (mínimo)
-  - Usa `nvm` para gestionar versiones: `nvm use` (lee automáticamente `.nvmrc`)
-  - Descarga: https://nodejs.org/
-- npm o yarn
-- Cuenta de Google Cloud con APIs habilitadas:
-  - Google Maps Distance Matrix API
-  - Google Maps Directions API
-  - Google Maps Geocoding API
-  - Google Maps Places API
-  - Google Sheets API
-- Archivo de credenciales de Google Service Account (JSON)
+### Prerrequisitos
 
-### Pasos de Instalación
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+- AWS CLI configurado
+- Cuenta de AWS con acceso a DynamoDB y Secrets Manager
 
-1. **Clonar el repositorio**
+### Setup
+
 ```bash
-git clone https://github.com/tu-usuario/Beezy-app.git
-cd Beezy-app
-```
+# 1. Clonar repositorio
+git clone <tu-repo>
+cd Pedidos
 
-2. **Instalar dependencias del frontend**
-```bash
+# 2. Instalar dependencias del frontend
 npm install
-```
 
-3. **Instalar dependencias del backend**
-```bash
+# 3. Instalar dependencias del backend
 cd server
 npm install
 cd ..
+
+# 4. Configurar variables de entorno
+cp server/env.example server/.env
+# Editar server/.env con tus valores
+
+# 5. Verificar que los secretos de AWS están configurados
+node server/scripts/verify-secrets.mjs
 ```
 
-4. **Configurar variables de entorno**
+## 🚀 Ejecución Local
 
-Crear archivo `.env` en la raíz del proyecto:
-```env
-# Google Sheets
-SHEET_ID=tu_sheet_id
-SHEET_NAME=Registros
-SERVICE_ACCOUNT_FILE=ruta/a/tu/service-account.json
-
-# Google Maps API
-GOOGLE_MAPS_API_KEY=tu_api_key
-
-# Backend
-PORT=5055
-VITE_BACKEND_URL=http://localhost:5055
-```
-
-Crear archivo `server/.env`:
-```env
-PORT=5055
-SHEET_ID=tu_sheet_id
-SHEET_NAME=Registros
-SERVICE_ACCOUNT_FILE=ruta/a/tu/service-account.json
-GOOGLE_MAPS_API_KEY=tu_api_key
-```
-
-5. **Configurar Google Sheets**
-
-Crear las siguientes pestañas en tu Google Sheet:
-- **Registros**: Para los pedidos (ver estructura en `server/index.js`)
-- **Notas**: Para las notas del equipo con columnas:
-  - ID, Estado, Fecha Creación, Operador, Descripción, Resuelto por, Fecha Resolución, Descripción resolución
-
-6. **Iniciar el servidor de desarrollo**
+### Opción 1: Todo junto
 ```bash
 npm run dev:all
 ```
 
-Esto iniciará tanto el frontend (puerto 5173) como el backend (puerto 5055).
+### Opción 2: Separado
 
-## 🚀 Uso
-
-### Desarrollo
+Terminal 1 - Backend:
 ```bash
-# Iniciar frontend y backend simultáneamente
-npm run dev:all
-
-# Solo frontend
-npm run client
-
-# Solo backend
 npm run server
 ```
 
-### Producción
+Terminal 2 - Frontend:
 ```bash
-# Build del frontend
-npm run build
+npm run dev
+```
 
-# Iniciar servidor de producción
-cd server
-npm start
+## 🌐 Deploy a AWS Amplify
+
+### ⚡ Quick Start
+
+```bash
+# 1. Commitear cambios
+git add .
+git commit -m "feat: Deploy a producción"
+git push origin master
+
+# 2. Verificar configuración
+./server/scripts/pre-deploy-check.sh
+
+# 3. Seguir la guía de deploy
+```
+
+### 📚 Documentación de Deploy
+
+- **[SETUP_COMPLETO.md](./SETUP_COMPLETO.md)** - Resumen ejecutivo completo ⭐
+- **[DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md)** - Guía paso a paso detallada
+- **[DEPLOY_AWS.md](./DEPLOY_AWS.md)** - Documentación técnica completa
+
+### 🔐 Seguridad
+
+Todas las credenciales están protegidas:
+- ✅ Google Maps API Key → AWS Secrets Manager
+- ✅ Google Service Account → AWS Secrets Manager
+- ✅ Sheet IDs → AWS Secrets Manager
+- ✅ JWT Secret → AWS Secrets Manager
+- ✅ Archivos sensibles en .gitignore
+
+## 🛠️ Scripts Disponibles
+
+### Frontend
+```bash
+npm run dev          # Desarrollo
+npm run build        # Build producción
+npm run preview      # Preview del build
+```
+
+### Backend
+```bash
+npm run server       # Iniciar servidor
+cd server && npm run dev  # Con nodemon
+```
+
+### Deploy
+```bash
+# Verificar secretos en AWS
+node server/scripts/verify-secrets.mjs
+
+# Migrar secretos a AWS
+node server/scripts/migrate-secrets-to-aws.mjs
+
+# Configurar permisos IAM
+./server/scripts/setup-iam-permissions.sh
+
+# Verificación completa pre-deploy
+./server/scripts/pre-deploy-check.sh
 ```
 
 ## 📁 Estructura del Proyecto
 
 ```
-Beezy-app/
-├── src/
-│   ├── components/          # Componentes React
-│   │   ├── forms/           # Formularios de pedidos
-│   │   ├── orders/          # Componentes de pedidos
-│   │   └── ...
-│   ├── pages/               # Páginas principales
-│   │   ├── Orders.jsx       # Gestión de pedidos
-│   │   ├── Notes.jsx        # Notas del equipo
-│   │   ├── Dashboard.jsx
-│   │   └── ...
-│   ├── hooks/               # Custom hooks
-│   │   ├── useAuth.js
-│   │   ├── useKanban.js
-│   │   ├── useWhatsApp.js
-│   │   └── ...
-│   ├── services/            # Servicios de API
-│   │   ├── ordersService.js
-│   │   ├── notesService.js
-│   │   ├── dateService.js
-│   │   ├── pdfService.js
-│   │   └── ...
-│   ├── utils/               # Utilidades
-│   │   ├── api.js
-│   │   ├── whatsAppUtils.js
-│   │   └── ...
-│   └── styles/              # Estilos CSS
-├── server/
-│   ├── routes/              # Rutas de la API
-│   │   ├── auth.js
-│   │   ├── client.js
-│   │   └── notes.js
-│   ├── middleware/          # Middlewares
-│   │   └── auth.js
-│   ├── utils/               # Utilidades del servidor
-│   │   ├── dynamodb.js
-│   │   └── secrets.js
-│   └── index.js             # Servidor principal
-├── public/                  # Archivos estáticos
-└── package.json
+Pedidos/
+├── src/                      # Frontend React
+│   ├── components/          # Componentes
+│   ├── pages/              # Páginas
+│   ├── hooks/              # Custom hooks
+│   ├── services/           # Servicios API
+│   └── utils/              # Utilidades
+├── server/                  # Backend Node.js
+│   ├── routes/             # Rutas API
+│   ├── middleware/         # Middlewares
+│   ├── utils/              # Utilidades
+│   └── scripts/            # Scripts de deploy
+├── public/                 # Assets estáticos
+├── amplify.yml            # Config AWS Amplify
+└── package.json           # Dependencias
+
+Documentación:
+├── SETUP_COMPLETO.md      # ⭐ Empieza aquí
+├── DEPLOY_CHECKLIST.md    # Guía de deploy
+└── DEPLOY_AWS.md          # Docs técnicas
 ```
 
-## 🔐 Seguridad
+## 🔧 Configuración
 
-- Las credenciales y API keys se almacenan en archivos `.env` (no incluidos en el repositorio)
-- Autenticación basada en roles
-- Validación de datos en frontend y backend
-- Rutas protegidas con middleware de autenticación
+### Variables de Entorno (server/.env)
 
-## 📝 Notas Importantes
+```bash
+# Google Sheets
+SHEET_ID=tu_sheet_id
+SHEET_NAME=Registros
+INVENTARIO_SHEET_ID=tu_inventario_id
 
-- El sistema usa Google Sheets como base de datos
-- Se requiere conexión a internet para usar las APIs de Google Maps
-- Los archivos de credenciales (`*.json`) no deben subirse al repositorio
-- Asegúrate de configurar correctamente los permisos del Service Account en Google Cloud
+# AWS (para producción)
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=pedidos/prod/all-secrets
 
-## 🎯 Funcionalidades Recientes
+# Puerto
+PORT=5055
+```
 
-- ✅ Sistema de notas del equipo con resolución y descripciones
-- ✅ Modularización del código para mejor mantenibilidad
-- ✅ Servicio centralizado de fechas (formato DD/MM/YYYY consistente)
-- ✅ Servicio modular de generación de PDFs
-- ✅ Hooks personalizados para Kanban y WhatsApp
-- ✅ Integración completa de WhatsApp con mensajes formateados
+### Variables de Entorno para Amplify
 
-## 🤝 Contribución
+```bash
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=pedidos/prod/all-secrets
+NODE_ENV=production
+PORT=5055
+```
 
-Este es un proyecto privado. Para contribuir, contacta al administrador del repositorio.
+## 🧪 Testing
+
+### Probar Login
+```bash
+# Local
+curl -X POST http://localhost:5055/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"usuario","password":"password"}'
+
+# Producción (reemplaza con tu URL)
+curl -X POST https://main.dXXXXXX.amplifyapp.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"usuario","password":"password"}'
+```
+
+## 📊 Endpoints API
+
+### Autenticación
+- `POST /api/auth/login` - Login de usuario
+
+### Clientes
+- `GET /api/client/clientes` - Listar clientes
+- Requiere autenticación JWT
+
+### Notas
+- `GET /api/notes` - Obtener notas
+- `POST /api/notes` - Crear nota
+- `PUT /api/notes/:id` - Actualizar nota
+- `DELETE /api/notes/:id` - Eliminar nota
+
+## 💰 Costos Estimados (AWS)
+
+- **AWS Amplify**: ~$15-30/mes
+- **AWS Secrets Manager**: ~$0.40/mes
+- **AWS DynamoDB**: Free tier (25 GB storage)
+- **Total**: ~$16-31/mes
+
+## 🆘 Troubleshooting
+
+### Error: "No se pudo calcular la distancia"
+- Verifica que GOOGLE_MAPS_API_KEY está configurada
+- Verifica que las APIs están habilitadas en Google Cloud Console
+
+### Error: "Access Denied to Secrets Manager"
+- Verifica que el rol de Amplify tiene la política adjunta
+- Ejecuta: `./server/scripts/setup-iam-permissions.sh`
+
+### Error: "Google Sheets API error"
+- Verifica que GOOGLE_SERVICE_ACCOUNT_JSON está en AWS Secrets
+- Verifica que la cuenta de servicio tiene acceso al spreadsheet
+
+## 📚 Recursos
+
+- [Guía de Deploy Completa](./SETUP_COMPLETO.md)
+- [AWS Amplify Docs](https://docs.amplify.aws/)
+- [Google Sheets API](https://developers.google.com/sheets/api)
+- [Google Maps API](https://developers.google.com/maps)
+
+## 👥 Usuarios
+
+Los usuarios se gestionan en AWS DynamoDB. Para agregar usuarios, usa el script en `server/scripts/` o la consola de DynamoDB.
+
+## 🔄 Actualizar Secretos
+
+```bash
+# Método 1: Script automatizado
+node server/scripts/migrate-secrets-to-aws.mjs
+
+# Método 2: AWS CLI
+aws secretsmanager update-secret \
+  --secret-id pedidos/prod/all-secrets \
+  --secret-string file://secrets.json
+```
+
+## 📝 Logs
+
+### Local
+- Logs del servidor: `server/logs/`
+- Combined logs: `server/logs/combined.log`
+- Error logs: `server/logs/error.log`
+
+### Producción (AWS)
+- Amplify Console → App → Hosting → Logs
+- CloudWatch → Log Groups → `/aws/amplify/pedidos`
+
+## 🎯 Próximos Pasos
+
+1. ✅ Todo está configurado localmente
+2. 📖 Lee [SETUP_COMPLETO.md](./SETUP_COMPLETO.md) para deploy a AWS
+3. 🚀 Sigue [DEPLOY_CHECKLIST.md](./DEPLOY_CHECKLIST.md) paso a paso
+4. 🌐 Deploy a AWS Amplify
+5. 🎉 ¡Comparte tu link!
+
+## 🤝 Contribuir
+
+Este es un proyecto privado. Para cambios:
+1. Crea una rama feature
+2. Haz tus cambios
+3. Haz commit con mensajes descriptivos
+4. Push y crea PR
 
 ## 📄 Licencia
 
 Privado - Todos los derechos reservados
 
-## 👥 Autores
-
-Equipo Beezy
-
 ---
 
-**Versión**: 2.0.0  
-**Última actualización**: Enero 2026
+**¿Listo para deployar?** → Empieza con [SETUP_COMPLETO.md](./SETUP_COMPLETO.md) 🚀

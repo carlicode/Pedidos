@@ -9,12 +9,12 @@
   --brand: #10b981; /* Verde esmeralda suave */
   --brand-600: #059669; /* Verde esmeralda oscuro */
   --brand-light: #a7f3d0; /* Verde menta claro */
-  --accent: #f59e0b; /* Ámbar/naranja suave */
-  --accent-light: #fbbf24; /* Ámbar claro */
+  --accent: #fbbf24; /* Ámbar/naranja claro (aclarado) */
+  --accent-light: #fcd34d; /* Ámbar más claro */
   --sky: #0ea5e9; /* Azul cielo vibrante */
   --sky-light: #7dd3fc; /* Azul cielo claro */
   --teal: #0f766e; /* Teal oscuro */
-  --yellow: #eab308; /* Amarillo suave */
+  --yellow: #fbbf24; /* Amarillo-naranja claro (aclarado) */
   --red: #ef4444; 
   --border: rgba(148, 163, 184, 0.2); /* Bordes sutiles */
   --border-hover: rgba(148, 163, 184, 0.3); 
@@ -32,12 +32,12 @@
   --brand: #10b981; /* Verde esmeralda (mismo) */
   --brand-600: #059669; /* Verde esmeralda oscuro (mismo) */
   --brand-light: #064e3b; /* Verde oscuro para modo oscuro */
-  --accent: #f59e0b; /* Ámbar (mismo) */
-  --accent-light: #d97706; /* Ámbar más oscuro */
+  --accent: #fbbf24; /* Ámbar claro (mismo) */
+  --accent-light: #fcd34d; /* Ámbar más claro */
   --sky: #0ea5e9; /* Azul cielo (mismo) */
   --sky-light: #0369a1; /* Azul más oscuro */
   --teal: #0f766e; /* Teal (mismo) */
-  --yellow: #eab308; /* Amarillo (mismo) */
+  --yellow: #fbbf24; /* Amarillo-naranja claro (mismo) */
   --red: #ef4444; /* Rojo (mismo) */
   --border: rgba(148, 163, 184, 0.1); /* Bordes más sutiles */
   --border-hover: rgba(148, 163, 184, 0.2); 
@@ -777,6 +777,25 @@ div .searchable-select .select-input {
   background: #dcfce7 !important;
   border-color: #16a34a !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Estilo específico para Medio de Transporte - fondo amarillo unificado */
+/* Usando --yellow (#fbbf24) como color estándar para todos los amarillos (aclarado) */
+.searchable-select.medio-transporte-yellow .select-input {
+  background: var(--yellow) !important; /* #fbbf24 - Amarillo-naranja claro */
+  color: #333 !important;
+  border-color: #f59e0b !important; /* Amarillo-naranja medio para borde */
+}
+
+.searchable-select.medio-transporte-yellow .select-input:hover {
+  background: #fcd34d !important; /* Amarillo-naranja más claro para hover */
+  border-color: #f59e0b !important;
+}
+
+.searchable-select.medio-transporte-yellow .select-input:focus {
+  background: #fcd34d !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 
 /* Campo deshabilitado */
