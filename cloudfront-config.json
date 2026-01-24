@@ -1,0 +1,60 @@
+{
+  "CallerReference": "pedidos-backend-2026-01-24",
+  "Comment": "Pedidos Backend HTTPS Proxy",
+  "Enabled": true,
+  "Origins": {
+    "Quantity": 1,
+    "Items": [
+      {
+        "Id": "pedidos-backend-origin",
+        "DomainName": "pedidos-backend-prod.eba-c22x9qsa.us-east-1.elasticbeanstalk.com",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "http-only",
+          "OriginSslProtocols": {
+            "Quantity": 1,
+            "Items": ["TLSv1.2"]
+          },
+          "OriginReadTimeout": 30,
+          "OriginKeepaliveTimeout": 5
+        }
+      }
+    ]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "pedidos-backend-origin",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 7,
+      "Items": ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"],
+      "CachedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"]
+      }
+    },
+    "ForwardedValues": {
+      "QueryString": true,
+      "Cookies": {
+        "Forward": "all"
+      },
+      "Headers": {
+        "Quantity": 5,
+        "Items": ["Authorization", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "Host"]
+      }
+    },
+    "MinTTL": 0,
+    "DefaultTTL": 0,
+    "MaxTTL": 0,
+    "Compress": true,
+    "TrustedSigners": {
+      "Enabled": false,
+      "Quantity": 0
+    }
+  },
+  "Comment": "Backend API with HTTPS",
+  "PriceClass": "PriceClass_100",
+  "ViewerCertificate": {
+    "CloudFrontDefaultCertificate": true
+  }
+}

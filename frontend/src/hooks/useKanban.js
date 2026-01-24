@@ -8,6 +8,8 @@
  * @param {Function} setDeliveryModal - Función para mostrar modal de entrega
  * @returns {Object} Funciones para gestionar el Kanban
  */
+import { getApiUrl } from '../utils/api.js'
+
 export function useKanban(orders, setOrders, logToCSV, showNotification, setMissingDataModal, setDeliveryModal) {
   
   /**
@@ -58,7 +60,7 @@ export function useKanban(orders, setOrders, logToCSV, showNotification, setMiss
       // Actualizar en Google Sheet usando el endpoint unificado
       // Este endpoint usa internamente filterOrderForSheet para garantizar consistencia
       try {
-        const response = await fetch(`/api/orders/${orderId}`, {
+        const response = await fetch(getApiUrl(`/api/orders/${orderId}`), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

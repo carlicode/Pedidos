@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { useAuth } from '../hooks/useAuth.js'
+import { getApiUrl } from '../utils/api.js'
 import '../styles/Notes.css'
 
 /**
@@ -37,7 +38,7 @@ export default function Notes() {
   const loadNotes = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/notes')
+      const response = await fetch(getApiUrl('/api/notes'))
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }))
@@ -72,7 +73,7 @@ export default function Notes() {
 
     setIsCreating(true)
     try {
-      const response = await fetch('/api/notes', {
+      const response = await fetch(getApiUrl('/api/notes'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getApiUrl } from '../utils/api.js'
 import '../styles/NotesFloatingButton.css'
 
 /**
@@ -25,7 +26,7 @@ export default function NotesFloatingButton() {
 
   const loadPendingCount = async () => {
     try {
-      const response = await fetch('/api/notes/pending-count')
+      const response = await fetch(getApiUrl('/api/notes/pending-count'))
       if (response.ok) {
         const data = await response.json()
         setPendingCount(data.count || 0)
