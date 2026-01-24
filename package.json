@@ -24,13 +24,13 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.24.1",
     "react-toastify": "^11.0.5",
+    "vite": "^5.3.4",
+    "@vitejs/plugin-react": "^5.0.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.2",
     "concurrently": "^9.2.0",
-    "papaparse": "^5.5.3",
-    "vite": "^5.3.4"
+    "papaparse": "^5.5.3"
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.0.0"
