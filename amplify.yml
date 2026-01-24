@@ -26,6 +26,7 @@ backend:
       commands:
         - cd server
         - npm ci
+        - cd ..
     build:
       commands:
         - echo "Backend build completed"
