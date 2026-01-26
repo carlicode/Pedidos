@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import '../styles/ClientInfoModal.css';
+import { getApiUrl } from '../utils/api.js';
 
 export default function ClientInfoModal({ isOpen, onClose, clientName }) {
   const [clientInfo, setClientInfo] = useState([]);
@@ -22,7 +23,7 @@ export default function ClientInfoModal({ isOpen, onClose, clientName }) {
     setError(null);
     
     try {
-      const response = await fetch(`http://localhost:5055/api/client-info/${encodeURIComponent(clientName)}`);
+      const response = await fetch(getApiUrl(`/api/client-info/${encodeURIComponent(clientName)}`));
       
       if (!response.ok) {
         throw new Error('Error al obtener información del cliente');
