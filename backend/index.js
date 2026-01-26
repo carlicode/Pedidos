@@ -176,6 +176,7 @@ app.use(express.static(path.join(__dirname, '..')))
 // Importar rutas DESPUÉS de cargar .env
 import authRoutes from './routes/auth.js'
 import notesRoutes from './routes/notes.js'
+import clientInfoRoutes from './routes/clientInfo.js'
 
 // Importar funciones para obtener secretos de AWS
 import { getSecrets } from './utils/secrets.js'
@@ -304,6 +305,9 @@ app.use('/api/auth', authLimiter, authRoutes)
 
 // Rutas de notas del equipo
 app.use('/api/notes', notesRoutes)
+
+// Rutas de información de clientes
+app.use('/api/client-info', clientInfoRoutes)
 
 // Health check endpoints
 import { healthCheck, readinessCheck, livenessCheck } from './utils/healthCheck.js'

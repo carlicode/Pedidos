@@ -7,6 +7,7 @@ import CotizacionModal from '../components/CotizacionModal.jsx'
 import NotesFloatingButton from '../components/NotesFloatingButton.jsx'
 import TimerModal from '../components/TimerModal.jsx'
 import CerrarTurnoModal from '../components/CerrarTurnoModal.jsx'
+import ClientInfoModal from '../components/ClientInfoModal.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import Horarios from './Horarios.jsx'
 import PedidosClientes from '../components/PedidosClientes.jsx'
@@ -362,6 +363,7 @@ export default function Orders() {
   const [duplicateModal, setDuplicateModal] = useState({ show: false, order: null, selectedDates: [], isDuplicating: false })
   const [duplicateSuccessModal, setDuplicateSuccessModal] = useState({ show: false, count: 0, lastDate: null })
   const [missingDataModal, setMissingDataModal] = useState({ show: false, order: null })
+  const [showClientInfoModal, setShowClientInfoModal] = useState(false)
   
   // Hook de Kanban para gestionar drag & drop y cambios de estado
   const kanbanHook = useKanban(
@@ -3637,6 +3639,25 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         required
                       />
                       )}
+                      <button 
+                        type="button" 
+                        className="btn-icon" 
+                        onClick={() => {
+                          if (!form.cliente || form.cliente === '__CUSTOM__') {
+                            toast.warning('Seleccione un cliente primero');
+                            return;
+                          }
+                          setShowClientInfoModal(true);
+                        }}
+                        title="Ver información del cliente"
+                        disabled={!form.cliente || form.cliente === '__CUSTOM__'}
+                        style={{
+                          opacity: (!form.cliente || form.cliente === '__CUSTOM__') ? 0.5 : 1,
+                          cursor: (!form.cliente || form.cliente === '__CUSTOM__') ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        ℹ️
+                      </button>
                       <button 
                         type="button" 
                         className="btn-icon" 
@@ -8287,6 +8308,13 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           onClose={() => setShowCerrarTurnoModal(false)}
         />
       )}
+
+      {/* Modal de Información del Cliente */}
+      <ClientInfoModal
+        isOpen={showClientInfoModal}
+        onClose={() => setShowClientInfoModal(false)}
+        clientName={form.cliente}
+      />
 
       {/* Alerta del Timer cuando llega el tiempo */}
       {mostrarAlerta && (
