@@ -1,12 +1,8 @@
 import express from 'express';
 import { google } from 'googleapis';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { getSecrets, getGoogleServiceAccountJSON } from '../utils/secrets.js';
 
 const router = express.Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Variables de entorno - leerlas cuando se necesiten
@@ -17,10 +13,6 @@ function getSheetId() {
 
 function getSheetName() {
   return process.env.SHEET_NAME || 'Registros';
-}
-
-function getServiceAccountFile() {
-  return process.env.GOOGLE_SERVICE_ACCOUNT_FILE || process.env.SERVICE_ACCOUNT_FILE || '../beezero-9fcc9255ca80.json';
 }
 
 /**
@@ -34,40 +26,35 @@ function quoteSheet(sheetName) {
 }
 
 /**
- * Helper para autenticar con Google Sheets
+ * Helper para autenticar con Google Sheets usando AWS Secrets Manager
  */
-function getAuthClient() {
-  let creds = null;
-  
-  const SERVICE_ACCOUNT_FILE = getServiceAccountFile();
-  
-  // Resolver ruta del service account
-  let serviceAccountPath;
-  if (SERVICE_ACCOUNT_FILE.startsWith('..')) {
-    // Si es relativa, resolver desde server/routes/ -> server/ -> raíz
-    serviceAccountPath = path.join(__dirname, '..', '..', SERVICE_ACCOUNT_FILE.replace(/^\.\.\//, ''));
-  } else {
-    serviceAccountPath = SERVICE_ACCOUNT_FILE;
+async function getAuthClient() {
+  try {
+    // Obtener credenciales desde AWS Secrets Manager
+    const serviceAccountJSON = await getGoogleServiceAccountJSON();
+    
+    if (!serviceAccountJSON) {
+      throw new Error('Google Service Account JSON no disponible en AWS Secrets Manager');
+    }
+    
+    const creds = JSON.parse(serviceAccountJSON);
+    
+    // Usar JWT para autenticación
+    const jwt = new google.auth.JWT(
+      creds.client_email,
+      undefined,
+      creds.private_key,
+      [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+      ]
+    );
+    
+    return jwt;
+  } catch (error) {
+    console.error('❌ Error obteniendo auth client:', error.message);
+    throw error;
   }
-  
-  if (!fs.existsSync(serviceAccountPath)) {
-    throw new Error(`Archivo de service account no encontrado: ${serviceAccountPath}`);
-  }
-  
-  creds = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-  
-  // Usar JWT en lugar de GoogleAuth para consistencia con el resto del código
-  const jwt = new google.auth.JWT(
-    creds.client_email,
-    undefined,
-    creds.private_key,
-    [
-      'https://www.googleapis.com/auth/spreadsheets',
-      'https://www.googleapis.com/auth/drive'
-    ]
-  );
-  
-  return jwt;
 }
 
 /**
