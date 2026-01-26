@@ -1,6 +1,6 @@
 import express from 'express';
 import { google } from 'googleapis';
-import { getSecrets, getGoogleServiceAccountJSON } from '../utils/secrets.js';
+import { getSecrets, getGoogleServiceAccountJson } from '../utils/secrets.js';
 
 const router = express.Router();
 
@@ -31,7 +31,7 @@ function quoteSheet(sheetName) {
 async function getAuthClient() {
   try {
     // Obtener credenciales desde AWS Secrets Manager
-    const serviceAccountJSON = await getGoogleServiceAccountJSON();
+    const serviceAccountJSON = await getGoogleServiceAccountJson();
     
     if (!serviceAccountJSON) {
       throw new Error('Google Service Account JSON no disponible en AWS Secrets Manager');
