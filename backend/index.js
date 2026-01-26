@@ -122,6 +122,10 @@ console.log(`  - Service Account File: ${SERVICE_ACCOUNT_FILE ? '✅ Configurado
 
 const app = express()
 
+// Trust proxy: Necesario para apps detrás de Load Balancer/CloudFront
+// Permite que Express confíe en headers X-Forwarded-* del proxy
+app.set('trust proxy', true)
+
 // CORS configuration con whitelist de orígenes
 const corsOptions = {
   origin: function (origin, callback) {
