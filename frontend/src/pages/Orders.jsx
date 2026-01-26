@@ -109,8 +109,9 @@ import { formatToStandardDate, prepareDateForSheet, normalizeOrderDate, formatDa
 
 // calculateDayOfWeek ahora se importa desde dataHelpers.js
 
-const initialOrder = {
-  fecha: getBoliviaDateISO(), // Fecha de hoy por defecto en zona horaria Bolivia
+// Función para crear un pedido inicial con fecha actual
+const createInitialOrder = () => ({
+  fecha: getBoliviaDateISO(), // Fecha de hoy por defecto en zona horaria Bolivia - SE ACTUALIZA DINÁMICAMENTE
   fecha_registro: '',
   hora_registro: '',
   operador: 'Usuario', // Valor por defecto, se actualizará con operadorDefault
@@ -138,12 +139,15 @@ const initialOrder = {
   observaciones: '',
   pago_biker: '',
   
-  dia_semana: calculateDayOfWeek(new Date().toISOString().split('T')[0]), // Calcular día de hoy
+  dia_semana: calculateDayOfWeek(getBoliviaDateISO()), // Calcular día de hoy dinámicamente
   cobro_pago: '',
   monto_cobro_pago: '',
   descripcion_cobro_pago: '',
   servicio: 'Beezy' // Beezy por defecto
-}
+})
+
+// Mantener initialOrder para compatibilidad, pero siempre usar createInitialOrder() para resetear
+const initialOrder = createInitialOrder()
 
 export default function Orders() {
   const { user, isAdmin } = useAuth()
@@ -494,6 +498,18 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
     setForm((f) => ({ ...f, operador: operadorDefault }))
   }, [operadorDefault, user])
+
+  // Actualizar fecha a "HOY" cuando se abre el formulario para un nuevo pedido
+  useEffect(() => {
+    // Solo actualizar si estamos en tab "agregar" Y NO estamos editando
+    if (activeTab === 'agregar' && !editingOrder) {
+      setForm(prev => ({
+        ...prev,
+        fecha: getBoliviaDateISO(), // Actualizar a fecha de HOY
+        dia_semana: calculateDayOfWeek(getBoliviaDateISO()) // Actualizar día de la semana
+      }))
+    }
+  }, [activeTab, editingOrder])
 
   // Auto-rellenar formulario cuando viene de pedido cliente
   useEffect(() => {
@@ -948,7 +964,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   const handleCancelEdit = () => {
 
     setEditingOrder(null)
-    setForm(initialOrder)
+    setForm({ ...createInitialOrder(), operador: operadorDefault })
     // Resetear el mensaje de WhatsApp
     resetWhatsappMessage()
     setPrecioEditadoManualmente(false)
@@ -2943,7 +2959,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       }
       
       // Limpiar formulario y recargar (común para crear y editar)
-      setForm({ ...initialOrder, operador: operadorDefault })
+      setForm({ ...createInitialOrder(), operador: operadorDefault })
       setPrecioEditadoManualmente(false)
       setRecojoManual(false)
       setEntregaManual(false)
@@ -3274,7 +3290,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
     setShowSuccessModal(false)
     // Limpiar el formulario para un nuevo pedido
-    setForm(initialOrder)
+    setForm({ ...createInitialOrder(), operador: operadorDefault })
     // Resetear el mensaje de WhatsApp
     resetWhatsappMessage()
     // Resetear estados

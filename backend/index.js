@@ -1862,7 +1862,8 @@ app.put('/api/orders/:id', async (req, res) => {
       const existingValue = existingRow[index] || ''
       
       // Campos que SÍ queremos poder vaciar intencionalmente (no preservar)
-      const canBeEmptied = ['Observaciones', 'Detalles de la Carrera', 'Hora Fin', 'Duracion', 'Tiempo de espera']
+      // NOTA: "Detalles de la Carrera" REMOVIDO - nunca queremos borrar descripciones accidentalmente
+      const canBeEmptied = ['Observaciones', 'Hora Fin', 'Duracion', 'Tiempo de espera']
       
       // Si el nuevo valor está vacío Y no es un campo que se puede vaciar, mantener el existente
       if (!newValue && !canBeEmptied.includes(columnName) && existingValue) {
