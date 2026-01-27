@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -10,21 +10,16 @@ import Horarios from './pages/Horarios.jsx'
 import InventarioAdmin from './pages/InventarioAdmin.jsx'
 import Unauthorized from './pages/Unauthorized.jsx'
 import Notes from './pages/Notes.jsx'
+import ThemeToggle from './components/ThemeToggle.jsx'
 import Icon from './components/Icon.jsx'
 import { useAuth } from './hooks/useAuth.js'
+import { useTheme } from './contexts/ThemeContext.jsx'
 
 export default function App() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('ui.theme') || 'dark')
+  const { theme } = useTheme()
   const { user, logout, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('ui.theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   const handleLogout = () => {
     logout()
@@ -48,17 +43,7 @@ export default function App() {
             <span className="brand-text">Beezy</span>
           </div>
           <div className="user-area">
-            <button
-              className="btn icon-btn"
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            >
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
-              <span style={{ marginLeft: '6px', fontSize: '12px' }}>
-                {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-              </span>
-            </button>
+            <ThemeToggle showLabel={true} size="medium" />
             <button className="btn" onClick={handleLogout}>
               <Icon name="logOut" size={16} style={{ marginRight: '6px' }} />
               Salir

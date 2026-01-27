@@ -364,6 +364,8 @@ export default function Orders() {
   const [duplicateSuccessModal, setDuplicateSuccessModal] = useState({ show: false, count: 0, lastDate: null })
   const [missingDataModal, setMissingDataModal] = useState({ show: false, order: null })
   const [showClientInfoModal, setShowClientInfoModal] = useState(false)
+  const [hasClientInfo, setHasClientInfo] = useState(false)
+  const [checkingClientInfo, setCheckingClientInfo] = useState(false)
   
   // Hook de Kanban para gestionar drag & drop y cambios de estado
   const kanbanHook = useKanban(
@@ -1130,6 +1132,49 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
     }
   }, [])
+
+  // Verificar si hay info de cliente en el sheet al cambiar cliente; habilitar botón ℹ️ solo si hay info
+  useEffect(() => {
+    const name = form.cliente?.trim()
+    if (!name || name === '__CUSTOM__') {
+      setHasClientInfo(false)
+      setCheckingClientInfo(false)
+      return
+    }
+    const ac = new AbortController()
+    setCheckingClientInfo(true)
+    setHasClientInfo(false)
+    fetch(getApiUrl(`/api/client-info/${encodeURIComponent(name)}`), { signal: ac.signal })
+      .then((res) => {
+        if (!res.ok) return { data: [] }
+        return res.json()
+      })
+      .then((data) => {
+        const list = data.data || []
+        if (list.length > 0) {
+          setHasClientInfo(true)
+          if (notificationAudioRef.current) {
+            notificationAudioRef.current.currentTime = 0
+            notificationAudioRef.current.play().catch(() => {})
+          }
+          toast.info('Revisar información cliente', {
+            position: 'top-right',
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          })
+        } else {
+          setHasClientInfo(false)
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setHasClientInfo(false)
+      })
+      .finally(() => setCheckingClientInfo(false))
+    return () => ac.abort()
+  }, [form.cliente])
 
   // ===== VERIFICADOR DE NOTIFICACIONES PARA CARRERAS AGENDADAS =====
   useEffect(() => {
@@ -3642,18 +3687,20 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       <button 
                         type="button" 
                         className="btn-icon" 
-                        onClick={() => {
-                          if (!form.cliente || form.cliente === '__CUSTOM__') {
-                            toast.warning('Seleccione un cliente primero');
-                            return;
-                          }
-                          setShowClientInfoModal(true);
-                        }}
-                        title="Ver información del cliente"
-                        disabled={!form.cliente || form.cliente === '__CUSTOM__'}
+                        onClick={() => setShowClientInfoModal(true)}
+                        title={
+                          !form.cliente || form.cliente === '__CUSTOM__'
+                            ? 'Seleccione un cliente primero'
+                            : checkingClientInfo
+                              ? 'Comprobando información...'
+                              : hasClientInfo
+                                ? 'Ver información del cliente'
+                                : 'No hay información de este cliente en el sheet'
+                        }
+                        disabled={!form.cliente || form.cliente === '__CUSTOM__' || checkingClientInfo || !hasClientInfo}
                         style={{
-                          opacity: (!form.cliente || form.cliente === '__CUSTOM__') ? 0.5 : 1,
-                          cursor: (!form.cliente || form.cliente === '__CUSTOM__') ? 'not-allowed' : 'pointer'
+                          opacity: (!form.cliente || form.cliente === '__CUSTOM__' || checkingClientInfo || !hasClientInfo) ? 0.5 : 1,
+                          cursor: (!form.cliente || form.cliente === '__CUSTOM__' || checkingClientInfo || !hasClientInfo) ? 'not-allowed' : 'pointer'
                         }}
                       >
                         ℹ️
@@ -6530,9 +6577,12 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           const cuentasTheme = {
             primary: '#16a34a',
             secondary: '#facc15',
-            dark: '#0f172a',
-            muted: '#6b7280',
-            card: '#f8fafc'
+            dark: 'var(--text)',
+            muted: 'var(--text-secondary)',
+            card: 'var(--card-bg)',
+            border: 'var(--border)',
+            inputBg: 'var(--input-bg)',
+            inputBorder: 'var(--input-border)'
           }
 
           const resumenFecha = loadingCuentasBiker
@@ -6584,10 +6634,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           const filterButtonStyle = (active) => ({
             padding: '10px 18px',
             borderRadius: '999px',
-            border: `1px solid ${active ? cuentasTheme.primary : '#e5e7eb'}`,
-            background: active ? cuentasTheme.primary : '#fff',
+            border: `1px solid ${active ? cuentasTheme.primary : cuentasTheme.inputBorder}`,
+            background: active ? cuentasTheme.primary : cuentasTheme.inputBg,
             color: active ? '#fff' : cuentasTheme.dark,
-                fontWeight: '600',
+            fontWeight: '600',
             cursor: 'pointer',
             transition: 'all 0.2s'
           })
@@ -6598,7 +6648,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                 flexDirection: 'column',
               gap: '18px',
               background: cuentasTheme.card,
-              border: '1px solid #e5e7eb',
+              border: `1px solid ${cuentasTheme.border}`,
               borderRadius: '16px',
               padding: '20px',
               width: '100%'
@@ -6617,7 +6667,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
                 {tipoFiltroBiker === 'dia' && (
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.muted, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.dark, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Icon name="calendar" size={16} /> Desde:
                       </label>
                     <input
@@ -6628,7 +6678,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         style={{
                           padding: '8px 12px',
                         borderRadius: '10px',
-                        border: '1px solid #d1d5db',
+                        border: `1px solid ${cuentasTheme.inputBorder}`,
+                        background: cuentasTheme.inputBg,
+                        color: cuentasTheme.dark,
                           fontSize: '14px',
                         width: '200px',
                         maxWidth: '100%'
@@ -6639,7 +6691,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
                 {tipoFiltroBiker === 'rango' && (
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.muted, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.dark, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Icon name="calendar" size={16} /> Desde:
                       </label>
                     <input
@@ -6650,13 +6702,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         style={{
                           padding: '8px 12px',
                       borderRadius: '10px',
-                      border: '1px solid #d1d5db',
+                      border: `1px solid ${cuentasTheme.inputBorder}`,
+                      background: cuentasTheme.inputBg,
+                      color: cuentasTheme.dark,
                           fontSize: '14px',
                       width: '180px',
                       maxWidth: '100%'
                         }}
                       />
-                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.muted, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 600, color: cuentasTheme.dark, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Icon name="calendar" size={16} /> Hasta:
                       </label>
                     <input
@@ -6667,7 +6721,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         style={{
                           padding: '8px 12px',
                       borderRadius: '10px',
-                      border: '1px solid #d1d5db',
+                      border: `1px solid ${cuentasTheme.inputBorder}`,
+                      background: cuentasTheme.inputBg,
+                      color: cuentasTheme.dark,
                           fontSize: '14px',
                       width: '180px',
                       maxWidth: '100%'
@@ -6751,21 +6807,21 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             }}>
                           {topBikers.map((biker, index) => (
                             <div key={biker.id || index} style={{
-                              background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
+                              background: 'var(--green-light)',
+                              border: `1px solid ${cuentasTheme.border}`,
                               borderRadius: '14px',
                               padding: '14px'
                             }}>
-                              <div style={{ fontSize: '12px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>
+                              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase' }}>
                                 Top #{index + 1}
                 </div>
-                              <div style={{ fontSize: '16px', fontWeight: 700, color: cuentasTheme.dark, margin: '4px 0 8px 0' }}>
+                              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', margin: '4px 0 8px 0' }}>
                                 {biker.nombre}
                 </div>
                               <div style={{ fontSize: '14px', fontWeight: 700, color: cuentasTheme.primary }}>
                                 Bs{calcularPagoTotalEntregado(biker).toFixed(2)}
                       </div>
-                              <div style={{ fontSize: '12px', color: cuentasTheme.muted }}>
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                                 {biker.entregas.filter(entrega => (entrega.estado || '').toLowerCase() === 'entregado').length} entregas
                       </div>
                       </div>
@@ -6781,18 +6837,21 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           alignItems: 'center',
                         marginBottom: '12px'
                         }}>
-                        <div style={{ flex: '1 1 260px', position: 'relative' }}>
-                          <Icon name="search" size={16} color={cuentasTheme.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <div style={{ flex: '1 1 260px', position: 'relative' }} className="cuentas-biker-search-wrap">
+                          <Icon name="search" size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
                           <input
                             type="text"
                             placeholder="Buscar biker por nombre..."
                             value={busquedaBiker}
                             onChange={(e) => setBusquedaBiker(e.target.value)}
+                            className="cuentas-biker-search-input"
                             style={{
                               width: '100%',
                               padding: '10px 12px 10px 36px',
                               borderRadius: '999px',
-                              border: '1px solid #e2e8f0',
+                              border: `1px solid ${cuentasTheme.inputBorder}`,
+                              background: cuentasTheme.inputBg,
+                              color: cuentasTheme.dark,
                               fontSize: '14px',
                               outline: 'none'
                             }}
@@ -6806,7 +6865,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                               padding: '10px 20px',
                             fontWeight: 600,
                               cursor: 'pointer',
-                            background: filtroEfectivoActivo ? cuentasTheme.primary : '#e2e8f0',
+                            background: filtroEfectivoActivo ? cuentasTheme.primary : 'var(--bg-tertiary)',
                             color: filtroEfectivoActivo ? '#fff' : cuentasTheme.dark,
                             boxShadow: filtroEfectivoActivo ? '0 8px 20px rgba(16, 185, 129, 0.25)' : 'none',
                             transition: 'all 0.2s ease'
@@ -6820,7 +6879,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                 <div style={{ 
                           padding: '18px',
                 borderRadius: '12px',
-                          border: '1px dashed #e2e8f0',
+                          border: `1px dashed ${cuentasTheme.border}`,
                 textAlign: 'center',
                           color: cuentasTheme.muted,
                           marginBottom: '18px'
@@ -6856,15 +6915,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       const montoTotalMostrar = filtroEfectivoActivo ? totalCarrerasEfectivo : totalCarrerasEntregadas
                       
         return (
-                      <div key={biker.id} style={{ marginBottom: '28px', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e5e7eb', background: '#fff' }}>
+                      <div key={biker.id} style={{ marginBottom: '28px', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${cuentasTheme.border}`, background: cuentasTheme.card }}>
             <div style={{ 
-                          background: '#d1fae5',
-                          color: '#065f46',
+                          background: 'var(--green-light)',
+                          color: 'var(--teal)',
                           padding: '18px',
               display: 'flex', 
                           justifyContent: 'space-between',
               alignItems: 'center',
-                          borderBottom: '1px solid #bef2cf'
+                          borderBottom: `1px solid ${cuentasTheme.border}`
             }}>
                           <div style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <span style={{
@@ -6884,7 +6943,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           <div style={{ fontSize: '13px', fontWeight: 600 }}>{entregasEntregadas.length} entregas</div>
                   </div>
 
-                        <div style={{ overflowX: 'auto', background: '#fff' }}>
+                        <div style={{ overflowX: 'auto', background: cuentasTheme.card }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed' }}>
                             <colgroup>
                               <col style={{ width: '7%' }} />
@@ -6896,7 +6955,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                               <col style={{ width: '9%' }} />
                             </colgroup>
                           <thead>
-                              <tr style={{ background: cuentasTheme.card, color: cuentasTheme.muted }}>
+                              <tr style={{ background: 'var(--bg-tertiary)', color: cuentasTheme.dark, borderBottom: `1px solid ${cuentasTheme.border}` }}>
                                 <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: 600 }}>ID</th>
                                 <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: 600 }}>Método</th>
                                 <th style={{ padding: '10px 8px', textAlign: 'left', fontWeight: 600 }}>Cliente</th>
@@ -6911,7 +6970,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                                 const metodoNormalizado = (entrega.metodoPago || '').toLowerCase()
                                 const esCuenta = metodoNormalizado === 'cuenta' || metodoNormalizado === 'a cuenta' || metodoNormalizado === 'qr'
                                 const rowStyle = {
-                                  background: idx % 2 === 0 ? '#fff' : '#f9fafb',
+                                  background: idx % 2 === 0 ? 'var(--card-bg)' : 'var(--bg-tertiary)',
+                                  color: cuentasTheme.dark,
                                   transition: 'filter 0.2s ease, opacity 0.2s ease',
                                   ...(filtroEfectivoActivo && esCuenta
                                     ? { opacity: 0.25, filter: 'blur(0.5px)' }
@@ -6920,7 +6980,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         return (
                                 <tr key={entrega.id} style={rowStyle}>
                                   <td style={{ padding: '10px 8px', fontWeight: 600 }}>{entrega.id}</td>
-                                  <td style={{ padding: '10px 8px', color: cuentasTheme.dark, fontWeight: 600 }}>
+                                  <td style={{ padding: '10px 8px', fontWeight: 600 }}>
                                     {entrega.metodoPago || 'N/A'}
                                 </td>
                                   <td style={{ padding: '10px 8px', fontWeight: 600 }} title={entrega.cliente}>
@@ -6970,7 +7030,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                               )})}
                           </tbody>
                             <tfoot>
-                              <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
+                              <tr style={{ background: 'var(--bg-tertiary)', borderTop: `2px solid ${cuentasTheme.border}` }}>
                                 <td colSpan={6} style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: cuentasTheme.dark }}>
                                   {etiquetaTotal}
                                 </td>
@@ -6987,7 +7047,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                           justifyContent: 'flex-start',
                           padding: '12px',
                           background: cuentasTheme.card,
-                          borderTop: '1px solid #e5e7eb',
+                          borderTop: `1px solid ${cuentasTheme.border}`,
                           color: cuentasTheme.muted,
                           fontSize: '12px'
                           }}>
@@ -7006,7 +7066,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       textAlign: 'center', 
                     padding: '60px 30px',
                     borderRadius: '16px',
-                    border: '2px dashed #e5e7eb',
+                    border: `2px dashed ${cuentasTheme.border}`,
                     background: cuentasTheme.card
               }}>
                     <Icon name="calendar" size={36} color={cuentasTheme.primary} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth.js'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import Icon from '../components/Icon.jsx'
 import NovedadesModal from '../components/NovedadesModal.jsx'
 import { shouldShowNovedades } from '../components/novedadesUtils.js'
@@ -12,19 +13,11 @@ export default function Login() {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [theme, setTheme] = useState(() => localStorage.getItem('ui.theme') || 'dark')
   const [showNovedades, setShowNovedades] = useState(false)
   const [pendingNavigation, setPendingNavigation] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('ui.theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   const handleNovedadesClose = () => {
     setShowNovedades(false)
@@ -111,41 +104,14 @@ export default function Login() {
       <div className="login-wrapper">
         <div className="login-card">
           {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            style={{
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              background: 'transparent',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              color: '#6b7280',
-              transition: 'all 0.2s',
-              zIndex: 10,
-              width: '36px',
-              height: '36px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9fafb'
-              e.currentTarget.style.borderColor = '#ffc107'
-              e.currentTarget.style.color = '#ffc107'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.borderColor = '#e5e7eb'
-              e.currentTarget.style.color = '#6b7280'
-            }}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
-          </button>
+          <div style={{ 
+            position: 'absolute', 
+            top: '16px', 
+            right: '16px', 
+            zIndex: 10 
+          }}>
+            <ThemeToggle showLabel={false} size="small" />
+          </div>
 
           {/* Header */}
           <div className="login-header">
@@ -156,12 +122,7 @@ export default function Login() {
             <h1 className="login-title" style={{ fontSize: '28px', marginBottom: '8px' }}>
               Iniciar sesión
             </h1>
-            <p style={{ 
-              fontSize: '15px', 
-              color: 'var(--muted)', 
-              textAlign: 'center',
-              marginBottom: '32px'
-            }}>
+            <p className="login-subtitle">
               Ingresa tus credenciales para continuar
             </p>
           </div>
@@ -208,33 +169,6 @@ export default function Login() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="toggle-password-btn"
                   disabled={isLoading}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#9ca3af',
-                    transition: 'all 0.2s ease',
-                    fontSize: '18px',
-                    borderRadius: '4px',
-                    width: '32px',
-                    height: '32px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#374151'
-                    e.currentTarget.style.background = '#f3f4f6'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#9ca3af'
-                    e.currentTarget.style.background = 'none'
-                  }}
                   title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
@@ -286,31 +220,9 @@ export default function Login() {
 
           <button
             type="button"
+            className="login-back-btn"
             onClick={() => navigate('/')}
             disabled={isLoading}
-            style={{
-              marginTop: '20px',
-              padding: '12px',
-              background: 'transparent',
-              border: 'none',
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              color: isLoading ? '#9ca3af' : '#6b7280',
-              transition: 'all 0.2s',
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              fontFamily: 'inherit',
-              opacity: isLoading ? 0.7 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (!isLoading) e.currentTarget.style.color = '#ffc107'
-            }}
-            onMouseLeave={(e) => {
-              if (!isLoading) e.currentTarget.style.color = '#6b7280'
-            }}
           >
             <Icon name="arrowLeft" size={16} />
             Volver al inicio

@@ -1,19 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import ThemeToggle from '../components/ThemeToggle.jsx'
 import Icon from '../components/Icon.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 export default function Landing() {
   const navigate = useNavigate()
   const { isAuthenticated, user, isLoading } = useAuth()
-  const [theme, setTheme] = useState(() => localStorage.getItem('ui.theme') || 'dark')
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('ui.theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
 
   // Redirigir usuarios autenticados (solo admin/operador) a pedidos
   useEffect(() => {
@@ -37,34 +30,7 @@ export default function Landing() {
             <img src="/abeja.png" alt="Beezy" className="header-logo" />
             <span className="brand-name">beezy</span>
           </div>
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              padding: '8px 12px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '14px',
-              color: 'var(--text)',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--input-bg)'
-              e.currentTarget.style.borderColor = 'var(--primary)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--surface)'
-              e.currentTarget.style.borderColor = 'var(--border)'
-            }}
-          >
-            <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
-            <span>{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
-          </button>
+          <ThemeToggle showLabel={true} size="medium" />
         </div>
       </header>
 
@@ -80,44 +46,11 @@ export default function Landing() {
                 Sistema centralizado para <strong>gestionar pedidos, horarios de drivers, cobros y reportes</strong> de manera eficiente y organizada.
               </p>
               
-              <div style={{ 
-                display: 'flex', 
-                gap: '12px', 
-                marginTop: '32px',
-                flexWrap: 'wrap'
-              }}>
+              <div className="hero-cta-wrap">
                 <button 
+                  type="button"
+                  className="cta-button"
                   onClick={() => navigate('/login')}
-                  style={{
-                    padding: '14px 32px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    borderRadius: '10px',
-                    border: '2px solid #f49f10',
-                    background: '#f49f10',
-                    color: '#1f2937',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontFamily: 'inherit',
-                    boxShadow: '0 8px 20px rgba(244, 159, 16, 0.35)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#fbbf24'
-                    e.currentTarget.style.borderColor = '#fbbf24'
-                    e.currentTarget.style.color = '#1a1a1a'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 10px 24px rgba(244, 159, 16, 0.45)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#f49f10'
-                    e.currentTarget.style.borderColor = '#f49f10'
-                    e.currentTarget.style.color = '#1f2937'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(244, 159, 16, 0.35)'
-                  }}
                 >
                   <Icon name="shield" size={20} />
                   Iniciar sesión

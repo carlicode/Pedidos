@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Script para actualizar/desplegar nueva versión del backend
-# Uso: ./server/scripts/eb-deploy.sh
+# Uso: ./backend/scripts/eb-deploy.sh
 
 set -e
 
@@ -25,7 +25,7 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 
 # Verificar que estamos en el directorio correcto
-if [ ! -f "server/package.json" ]; then
+if [ ! -f "backend/package.json" ]; then
     echo -e "${RED}❌ Error: Debes ejecutar este script desde la raíz del proyecto${NC}"
     exit 1
 fi
@@ -34,7 +34,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}📦 Empaquetando código...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-cd server
+cd backend
 zip -r ../pedidos-backend.zip . -x "*.git*" "node_modules/*" "scripts/*" "test-*" "logs/*"
 cd ..
 
@@ -131,6 +131,6 @@ echo -e "Versión:     ${GREEN}$VERSION_LABEL${NC}"
 echo -e "Estado:      ${GREEN}$STATUS${NC}"
 echo -e "Salud:       ${GREEN}$HEALTH${NC}"
 echo ""
-echo -e "Ver estado:  ${BLUE}./server/scripts/eb-status.sh${NC}"
-echo -e "Ver logs:    ${BLUE}./server/scripts/eb-logs.sh${NC}"
+echo -e "Ver estado:  ${BLUE}./backend/scripts/eb-status.sh${NC}"
+echo -e "Ver logs:    ${BLUE}./backend/scripts/eb-logs.sh${NC}"
 echo ""

@@ -335,13 +335,7 @@ export default function Notes() {
                         {fechaResolucion && ` el ${fechaResolucion}`}
                       </div>
                       {descripcionResolucion && (
-                        <div style={{ 
-                          marginTop: '8px', 
-                          padding: '8px', 
-                          background: '#f0fff4', 
-                          borderRadius: '6px',
-                          borderLeft: '3px solid #48bb78'
-                        }}>
+                        <div className="note-resolved-detail">
                           <strong>Nota de resolución:</strong> {descripcionResolucion}
                         </div>
                       )}
@@ -417,7 +411,6 @@ export default function Notes() {
                   onChange={(e) => setNewNote({ ...newNote, descripcion: e.target.value })}
                   placeholder="Escribe aquí tu nota para el equipo..."
                   rows={6}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
                 />
               </div>
             </div>
@@ -473,7 +466,7 @@ export default function Notes() {
                   type="text" 
                   value={currentUser} 
                   disabled
-                  style={{ background: '#f0f0f0', cursor: 'not-allowed' }}
+                  className="form-input-disabled"
                 />
               </div>
               
@@ -484,7 +477,6 @@ export default function Notes() {
                   onChange={(e) => setDescripcionResolucion(e.target.value)}
                   placeholder="Escribe una nota sobre cómo se resolvió esta nota..."
                   rows={4}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
                 />
               </div>
             </div>
@@ -538,7 +530,6 @@ export default function Notes() {
                   onChange={(e) => setEditNote({ ...editNote, descripcion: e.target.value })}
                   placeholder="Escribe aquí tu nota para el equipo..."
                   rows={6}
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }}
                 />
               </div>
             </div>

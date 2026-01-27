@@ -122,9 +122,15 @@ console.log(`  - Service Account File: ${SERVICE_ACCOUNT_FILE ? '✅ Configurado
 
 const app = express()
 
-// Trust proxy: Necesario para apps detrás de Load Balancer/CloudFront
-// Permite que Express confíe en headers X-Forwarded-* del proxy
-app.set('trust proxy', true)
+// Trust proxy: Solo en producción (detrás de Load Balancer/CloudFront)
+// En desarrollo local (localhost) NO debe estar activo por seguridad
+const isProduction = process.env.NODE_ENV === 'production' || process.env.AWS_EXECUTION_ENV
+if (isProduction) {
+  app.set('trust proxy', true)
+  console.log('🔒 Trust proxy activado (ambiente de producción)')
+} else {
+  console.log('🏠 Trust proxy desactivado (ambiente de desarrollo)')
+}
 
 // CORS configuration con whitelist de orígenes
 const corsOptions = {

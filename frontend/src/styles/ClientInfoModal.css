@@ -1,3 +1,4 @@
+/* ClientInfoModal - Compatible con dark mode */
 .client-info-modal {
   max-width: 800px;
   width: 90%;
@@ -5,26 +6,65 @@
   overflow-y: auto;
 }
 
+.client-info-modal .modal-header {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border);
+}
+
+.client-info-modal .modal-header h2 {
+  color: var(--text);
+  margin: 0;
+}
+
+.client-info-modal .modal-body {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.client-info-modal .modal-footer {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border);
+}
+
+.client-info-modal .modal-footer .btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.client-info-modal .modal-footer .btn-secondary:hover {
+  background: var(--border-hover);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
 .client-info-search {
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--bg-tertiary);
   border-radius: 6px;
   margin-bottom: 20px;
   font-size: 14px;
+  border: 1px solid var(--border);
 }
 
 .client-info-search strong {
-  color: #2563eb;
+  color: var(--brand);
 }
 
 .loading-state {
   text-align: center;
   padding: 40px 20px;
+  color: var(--text-secondary);
+}
+
+.loading-state p {
+  margin: 0;
+  color: var(--text-secondary);
 }
 
 .spinner {
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #2563eb;
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--brand);
   border-radius: 50%;
   width: 40px;
   height: 40px;
@@ -39,11 +79,17 @@
 
 .error-state {
   padding: 20px;
-  background: #fee;
-  border: 1px solid #fcc;
+  background: var(--red-light);
+  border: 1px solid var(--red);
   border-radius: 6px;
-  color: #c33;
+  color: var(--red);
   text-align: center;
+}
+
+.error-state p {
+  margin: 0;
+  color: var(--red);
+  font-weight: 500;
 }
 
 .client-info-results {
@@ -53,33 +99,34 @@
 .results-count {
   margin-bottom: 16px;
   padding: 8px 12px;
-  background: #e8f4f8;
-  border-left: 3px solid #2563eb;
+  background: var(--sky-light);
+  border-left: 3px solid var(--sky);
   border-radius: 4px;
   font-size: 14px;
+  color: var(--text);
 }
 
 .results-count strong {
-  color: #2563eb;
+  color: var(--sky);
   font-weight: 600;
 }
 
 .client-info-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 16px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow 0.2s;
 }
 
 .client-info-card:hover {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .client-info-card .card-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-600) 100%);
   padding: 12px 16px;
   color: white;
 }
@@ -88,10 +135,12 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: white;
 }
 
 .client-info-card .card-body {
   padding: 16px;
+  background: var(--bg-tertiary);
 }
 
 .info-row {
@@ -99,7 +148,7 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .info-row:last-child {
@@ -108,14 +157,14 @@
 
 .info-row .label {
   font-weight: 600;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-size: 13px;
   min-width: 140px;
   flex-shrink: 0;
 }
 
 .info-row .value {
-  color: #1f2937;
+  color: var(--text);
   font-size: 14px;
   text-align: right;
   flex: 1;
@@ -125,16 +174,16 @@
 .info-row .value.tag {
   display: inline-block;
   padding: 4px 12px;
-  background: #dbeafe;
+  background: var(--sky-light);
   border-radius: 12px;
-  color: #1e40af;
+  color: var(--sky);
   font-size: 12px;
   font-weight: 500;
 }
 
 .info-row .value.payment-type {
   font-weight: 600;
-  color: #059669;
+  color: var(--brand);
 }
 
 /* Responsive */
