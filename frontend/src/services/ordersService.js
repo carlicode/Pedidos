@@ -459,8 +459,9 @@ export const getNextId = async () => {
     }
     
   } catch (error) {
-    // Fallback: usar timestamp como ID único
-    const timestampId = Date.now()
-    return timestampId
+    // NO usar timestamp como fallback - esto causa IDs inválidos
+    // En su lugar, lanzar el error para que el frontend lo maneje apropiadamente
+    console.error('❌ Error obteniendo siguiente ID:', error.message)
+    throw new Error('No se pudo obtener el siguiente ID. Verifica tu conexión e intenta nuevamente.')
   }
 }

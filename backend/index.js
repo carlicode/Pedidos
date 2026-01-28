@@ -1788,12 +1788,21 @@ app.put('/api/orders/:id', async (req, res) => {
     const orderId = req.params.id
     const order = req.body || {}
     
-    console.log('📥 [PUT /api/orders/:id] Datos recibidos:', {
-      orderId,
-      recojo: order.Recojo || order.recojo,
-      entrega: order.Entrega || order.entrega,
-      estado: order.Estado || order.estado
+    console.log('═══════════════════════════════════════')
+    console.log('📥 [PUT /api/orders/:id] INICIO DE ACTUALIZACIÓN')
+    console.log('📥 Order ID:', orderId)
+    console.log('📥 Datos completos recibidos:', JSON.stringify(order, null, 2))
+    console.log('📥 Campos principales:', {
+      ID: order.ID || order.id,
+      Cliente: order.Cliente || order.cliente,
+      Recojo: order.Recojo || order.recojo,
+      Entrega: order.Entrega || order.entrega,
+      Estado: order.Estado || order.estado,
+      Biker: order.Biker || order.biker,
+      'Precio [Bs]': order['Precio [Bs]'] || order.precio_bs,
+      'Dist. [Km]': order['Dist. [Km]'] || order.distancia_km
     })
+    console.log('═══════════════════════════════════════')
     
     if (!orderId) {
       return res.status(400).json({ 
@@ -1891,20 +1900,31 @@ app.put('/api/orders/:id', async (req, res) => {
     // HEADER_ORDER tiene 31 columnas (A hasta AE)
     const lastColumn = 'AE'
     
+    console.log('📊 Fila mezclada final a escribir (primeras 15 cols):', mergedRow.slice(0, 15))
+    console.log('📊 Rango de actualización:', `${quoted}!A${rowIndex}:${lastColumn}${rowIndex}`)
+    console.log('📊 Total de columnas:', mergedRow.length)
+    
     // Actualizar la fila en el sheet con la fila mezclada
-    await sheets.spreadsheets.values.update({
+    const updateResponse = await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: `${quoted}!A${rowIndex}:${lastColumn}${rowIndex}`,
       valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
       requestBody: { values: [mergedRow] }
     })
     
+    console.log('✅ Respuesta de Google Sheets API:', {
+      status: updateResponse.status,
+      statusText: updateResponse.statusText,
+      updatedCells: updateResponse.data?.updatedCells || 0
+    })
     console.log(`✅ Pedido #${orderId} actualizado exitosamente en fila ${rowIndex}`)
+    console.log('═══════════════════════════════════════')
     
     res.json({ 
       success: true, 
       message: `Pedido #${orderId} actualizado exitosamente`,
-      rowIndex
+      rowIndex,
+      updatedCells: updateResponse.data?.updatedCells || 0
     })
     
   } catch (error) {
@@ -3679,18 +3699,33 @@ app.get('/api/next-id', async (req, res) => {
     console.log('📊 Filas obtenidas para IDs:', rows.length)
     
     // Extraer IDs numéricos válidos (saltar header)
+    // IMPORTANTE: Filtrar IDs que sean timestamps (números muy grandes)
+    // Los IDs válidos deben ser < 100000 para evitar problemas con Date.now() fallback
+    const MAX_VALID_ID = 100000
     const ids = []
+    const invalidIds = [] // Para logging de IDs inválidos
+    
     for (let i = 1; i < rows.length; i++) { // Empezar desde fila 2 (saltar header)
       const cellValue = rows[i] && rows[i][0]
       if (cellValue) {
         const numId = parseInt(String(cellValue).trim())
         if (!isNaN(numId) && numId > 0) {
-          ids.push(numId)
+          if (numId < MAX_VALID_ID) {
+            ids.push(numId)
+          } else {
+            invalidIds.push({ row: i + 1, id: numId })
+          }
         }
       }
     }
     
-    console.log('🔢 IDs encontrados:', ids)
+    if (invalidIds.length > 0) {
+      console.warn('⚠️ IDs inválidos encontrados (probablemente timestamps):', invalidIds.length)
+      console.warn('   Primeros 5:', invalidIds.slice(0, 5))
+    }
+    
+    console.log('🔢 IDs válidos encontrados:', ids.length)
+    console.log('   IDs válidos (últimos 10):', ids.slice(-10))
     
     // Calcular el próximo ID
     const nextId = ids.length > 0 ? Math.max(...ids) + 1 : 1

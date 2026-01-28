@@ -2896,11 +2896,21 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     try {
       if (editingOrder) {
         // ============ MODO EDICIÓN ============
+        console.log('🔄 INICIANDO EDICIÓN DE PEDIDO')
+        console.log('📋 Datos del formulario:', form)
+        console.log('📋 editingOrder original:', editingOrder)
+        
         showNotification('🔄 Guardando cambios...', 'info')
         
         // Normalizar la fecha al formato estándar DD/MM/YYYY
         // Si está vacía, usar fecha original del pedido
         const fechaNormalizada = formatToStandardDate(form.fecha) || editingOrder.fecha
+        
+        console.log('📅 Fecha normalizada:', {
+          'form.fecha': form.fecha,
+          'editingOrder.fecha': editingOrder.fecha,
+          'fechaNormalizada': fechaNormalizada
+        })
         
         // Crear objeto actualizado manteniendo campos originales
         const updatedOrder = {
@@ -2914,11 +2924,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           estado_pago: form.estado_pago || 'Debe Cliente'
         }
         
+        console.log('📤 Objeto a enviar (updatedOrder):', updatedOrder)
+        console.log('📤 ID del pedido:', updatedOrder.id)
+        
         // Actualizar en el sheet usando la función refactorizada
         // Ahora updateOrderInSheet usa filterOrderForSheet internamente
-        await updateOrderInSheetAPI(updatedOrder)
-        
-        showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
+        try {
+          const result = await updateOrderInSheetAPI(updatedOrder)
+          console.log('✅ Respuesta del servidor:', result)
+          showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
+        } catch (updateError) {
+          console.error('❌ Error al actualizar pedido:', updateError)
+          console.error('❌ Error completo:', {
+            message: updateError.message,
+            stack: updateError.stack
+          })
+          throw updateError
+        }
         
         // Limpiar modo edición
         setEditingOrder(null)
@@ -2938,7 +2960,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         try {
           nextId = await getNextId()
         } catch (error) {
-          nextId = Date.now() // Fallback a timestamp
+          console.error('❌ Error obteniendo siguiente ID:', error)
+          toast.error('No se pudo obtener el ID del pedido. Verifica tu conexión e intenta nuevamente.')
+          setSubmitting(false)
+          return
         }
         
         // Normalizar la fecha al formato estándar DD/MM/YYYY
