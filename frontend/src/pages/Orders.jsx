@@ -466,7 +466,12 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   }
 
   const operadorDefault = useMemo(() => {
-    return user?.name || 'Usuario'
+    console.log('🔍 [operadorDefault] user:', user)
+    console.log('🔍 [operadorDefault] user?.name:', user?.name)
+    console.log('🔍 [operadorDefault] user?.username:', user?.username)
+    const nombreOperador = user?.name || user?.username || 'Usuario'
+    console.log('🔍 [operadorDefault] nombreOperador final:', nombreOperador)
+    return nombreOperador
   }, [user])
 
   // Cargar datos iniciales desde localStorage (como caché rápido)
