@@ -194,6 +194,7 @@ import { getSecrets } from './utils/secrets.js'
 // Importar sistema de logging
 import logger, { logSystem } from './utils/logger.js'
 import { requestLogger, errorLogger } from './middleware/logging.js'
+import { logAuditEntry } from './utils/auditLogger.js'
 
 // Importar rate limiting y security
 import rateLimit from 'express-rate-limit'
@@ -1765,6 +1766,15 @@ app.post('/api/orders', async (req, res) => {
         requestBody: { values: [newRow] }
       })
       console.log(`✅ Added order with NEW ID #${newId} (original was ${orderId})`)
+      
+      // Registrar en audit log
+      logAuditEntry('CREAR', order, {
+        operator: order.Operador || order.operador,
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('user-agent'),
+        warning: `ID duplicado detectado. Original: ${orderId}, Nuevo: ${newId}`,
+        existingId: orderId
+      });
     } else {
       // Agregar nueva fila (flujo normal)
       // HEADER_ORDER tiene 31 columnas (A hasta AE)
@@ -1776,6 +1786,13 @@ app.post('/api/orders', async (req, res) => {
         requestBody: { values: [row] }
       })
       console.log(`✅ Added new order #${orderId}`)
+      
+      // Registrar en audit log
+      logAuditEntry('CREAR', order, {
+        operator: order.Operador || order.operador,
+        ip: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('user-agent')
+      });
     }
 
     res.json({ ok: true, updated: existingRowIndex > 0 })
@@ -1884,6 +1901,12 @@ app.put('/api/orders/:id', async (req, res) => {
     
     const existingRow = (existingRowResponse.data.values && existingRowResponse.data.values[0]) || []
     
+    // Construir objeto "before" para audit log (mapear fila a objeto)
+    const beforeData = {};
+    HEADER_ORDER.forEach((header, index) => {
+      beforeData[header] = existingRow[index] || '';
+    });
+    
     // Construir nueva fila con buildRow
     const newRow = buildRow(order)
     
@@ -1928,6 +1951,15 @@ app.put('/api/orders/:id', async (req, res) => {
     })
     console.log(`✅ Pedido #${orderId} actualizado exitosamente en fila ${rowIndex}`)
     console.log('═══════════════════════════════════════')
+    
+    // Registrar en audit log
+    logAuditEntry('EDITAR', order, {
+      operator: order.Operador || order.operador,
+      ip: req.ip || req.connection.remoteAddress,
+      userAgent: req.get('user-agent'),
+      rowIndex: rowIndex,
+      updatedCells: updateResponse.data?.updatedCells || 0
+    }, beforeData);
     
     res.json({ 
       success: true, 
@@ -3683,6 +3715,82 @@ app.put('/api/horarios/restore', (req, res) => {
     })
   }
 })
+
+/**
+ * ENDPOINTS DE AUDITORÍA
+ * Consultar logs de auditoría
+ */
+
+// Obtener audit log de un pedido específico
+app.get('/api/audit/order/:id', async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    
+    if (!orderId) {
+      return res.status(400).json({ error: 'ID de pedido requerido' });
+    }
+    
+    const { getAuditLogsForOrder } = await import('./utils/auditLogger.js');
+    const logs = getAuditLogsForOrder(orderId);
+    
+    res.json({
+      success: true,
+      orderId,
+      count: logs.length,
+      logs
+    });
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo audit logs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo audit logs',
+      details: error.message
+    });
+  }
+});
+
+// Obtener estadísticas de auditoría
+app.get('/api/audit/stats', async (req, res) => {
+  try {
+    const { getAuditStats } = await import('./utils/auditLogger.js');
+    const stats = getAuditStats();
+    
+    res.json({
+      success: true,
+      stats
+    });
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo estadísticas',
+      details: error.message
+    });
+  }
+});
+
+// Listar archivos de audit log
+app.get('/api/audit/files', async (req, res) => {
+  try {
+    const { listAuditLogFiles } = await import('./utils/auditLogger.js');
+    const files = listAuditLogFiles();
+    
+    res.json({
+      success: true,
+      files
+    });
+    
+  } catch (error) {
+    console.error('❌ Error listando archivos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error listando archivos',
+      details: error.message
+    });
+  }
+});
 
 // Endpoint para obtener el próximo ID de forma segura
 app.get('/api/next-id', async (req, res) => {

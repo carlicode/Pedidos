@@ -8,6 +8,7 @@ npm-debug.log
 *.json
 .DS_Store
 logs/*.log
+logs/audit/*.json
 test-*.mjs
 test-*.sh
 
