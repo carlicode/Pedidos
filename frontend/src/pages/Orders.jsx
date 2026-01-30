@@ -735,7 +735,20 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       }
       
       // Asegurar que distancia_km se incluya con todas sus variantes posibles
-      const distanciaValue = editingOrder.distancia_km || editingOrder['Dist. [Km]'] || editingOrder.distancia || ''
+      let distanciaValue = editingOrder.distancia_km || editingOrder['Dist. [Km]'] || editingOrder.distancia || ''
+      
+      // Normalizar distancia: remover apóstrofe y convertir coma a punto
+      distanciaValue = String(distanciaValue || '').trim()
+      
+      // 1. Remover apóstrofe inicial si existe (Google Sheets usa ' para forzar texto)
+      if (distanciaValue.startsWith("'")) {
+        distanciaValue = distanciaValue.substring(1)
+      }
+      
+      // 2. Convertir coma a punto (formato europeo a formato numérico estándar)
+      if (distanciaValue.includes(',')) {
+        distanciaValue = distanciaValue.replace(',', '.')
+      }
       
       // Asegurar que medio_transporte se incluya
       const medioTransporteValue = editingOrder.medio_transporte || editingOrder['Medio Transporte'] || editingOrder.medioTransporte || ''

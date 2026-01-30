@@ -543,6 +543,34 @@ function buildRow(order) {
       }
     }
     
+    // Normalizar Dist. [Km] - remover apóstrofe y convertir coma a punto
+    if (columnName === 'Dist. [Km]' && value) {
+      let distStr = String(value).trim()
+      // Remover apóstrofe inicial si existe (Google Sheets usa ' para forzar texto)
+      if (distStr.startsWith("'")) {
+        distStr = distStr.substring(1)
+      }
+      // Convertir coma a punto (formato europeo a estándar)
+      if (distStr.includes(',')) {
+        distStr = distStr.replace(',', '.')
+      }
+      value = distStr
+    }
+    
+    // Normalizar Precio [Bs] - remover apóstrofe y convertir coma a punto
+    if (columnName === 'Precio [Bs]' && value) {
+      let precioStr = String(value).trim()
+      // Remover apóstrofe inicial si existe
+      if (precioStr.startsWith("'")) {
+        precioStr = precioStr.substring(1)
+      }
+      // Convertir coma a punto
+      if (precioStr.includes(',')) {
+        precioStr = precioStr.replace(',', '.')
+      }
+      value = precioStr
+    }
+    
     row[i] = value
     
     // Log especial para Hora Registro
