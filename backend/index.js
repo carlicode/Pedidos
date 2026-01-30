@@ -3820,6 +3820,87 @@ app.get('/api/audit/files', async (req, res) => {
   }
 });
 
+/**
+ * ENDPOINT DE VERIFICACIÓN DE ID
+ * Verifica si un ID específico ya existe en el sheet
+ */
+app.get('/api/verify-id/:id', async (req, res) => {
+  try {
+    const idToVerify = req.params.id;
+    
+    if (!idToVerify) {
+      return res.status(400).json({ 
+        exists: false, 
+        error: 'ID no proporcionado' 
+      });
+    }
+    
+    console.log('🔍 Verificando si ID existe:', idToVerify);
+    
+    if (!SHEET_ID) {
+      return res.status(400).json({ 
+        exists: false, 
+        error: 'SHEET_ID no configurado' 
+      });
+    }
+    
+    const auth = await getAuthClient();
+    await auth.authorize();
+    const sheets = google.sheets({ version: 'v4', auth });
+    const quoted = quoteSheet(SHEET_NAME);
+    
+    // Leer TODOS los IDs de la columna A
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${quoted}!A:A`
+    });
+    
+    const rows = response.data.values || [];
+    const MAX_VALID_ID = 100000;
+    
+    // Buscar el ID en todas las filas (saltando el header)
+    let exists = false;
+    let foundAt = -1;
+    
+    for (let i = 1; i < rows.length; i++) {
+      const cellValue = rows[i] && rows[i][0];
+      if (cellValue) {
+        const sheetId = String(cellValue).trim();
+        if (sheetId === String(idToVerify).trim()) {
+          exists = true;
+          foundAt = i + 1; // +1 porque sheets empiezan en 1
+          break;
+        }
+      }
+    }
+    
+    if (exists) {
+      console.log(`⚠️ ID ${idToVerify} YA EXISTE en fila ${foundAt}`);
+      res.json({
+        exists: true,
+        id: idToVerify,
+        foundAt: foundAt,
+        message: `El ID ${idToVerify} ya está en uso`
+      });
+    } else {
+      console.log(`✅ ID ${idToVerify} está disponible`);
+      res.json({
+        exists: false,
+        id: idToVerify,
+        message: `El ID ${idToVerify} está disponible`
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error verificando ID:', error);
+    res.status(500).json({
+      exists: false,
+      error: 'Error verificando ID',
+      details: error.message
+    });
+  }
+});
+
 // Endpoint para obtener el próximo ID de forma segura
 app.get('/api/next-id', async (req, res) => {
   try {

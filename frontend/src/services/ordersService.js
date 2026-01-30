@@ -433,6 +433,40 @@ export const saveLogsToServer = async (logs) => {
 }
 
 /**
+ * Verifica si un ID específico ya existe en el sheet
+ * @param {number|string} id - ID a verificar
+ * @returns {Promise<Object>} Resultado de la verificación
+ */
+export const verifyIdExists = async (id) => {
+  try {
+    const { apiFetch } = await import('../utils/api.js')
+    const response = await apiFetch(`/api/verify-id/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(10000) // Timeout de 10 segundos
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      return {
+        exists: data.exists,
+        id: data.id,
+        foundAt: data.foundAt,
+        message: data.message
+      }
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
+  } catch (error) {
+    console.error('❌ Error verificando ID:', error.message)
+    throw new Error('No se pudo verificar el ID. Verifica tu conexión e intenta nuevamente.')
+  }
+}
+
+/**
  * Obtiene el siguiente ID disponible para un pedido
  * @returns {Promise<number>} Siguiente ID disponible
  */

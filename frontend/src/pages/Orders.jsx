@@ -2961,23 +2961,66 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         
       } else {
         // ============ MODO CREAR ============
-        showNotification('🔄 Agregando pedido...', 'info')
+        showNotification('🔄 Obteniendo siguiente ID disponible...', 'info')
         
         // Log: Intento de envío del formulario
         await logToCSV('form_submit_attempt', { formData: form }, 'info')
         
-        // Generar fecha, hora y ID para el nuevo pedido
+        // Generar fecha y hora para el nuevo pedido
         const { fechaRegistro, horaRegistro } = getBoliviaDateTime()
         
+        // PASO 1: Obtener el siguiente ID disponible
         let nextId
         try {
           nextId = await getNextId()
+          console.log('📝 Siguiente ID disponible:', nextId)
         } catch (error) {
           console.error('❌ Error obteniendo siguiente ID:', error)
           toast.error('No se pudo obtener el ID del pedido. Verifica tu conexión e intenta nuevamente.')
           setSubmitting(false)
           return
         }
+        
+        // PASO 2: VALIDACIÓN CRÍTICA - Verificar que el ID NO existe antes de crear
+        showNotification('🔍 Verificando que el ID esté disponible...', 'info')
+        const { verifyIdExists } = await import('../services/ordersService.js')
+        
+        try {
+          const verification = await verifyIdExists(nextId)
+          
+          if (verification.exists) {
+            // ⚠️ PROBLEMA: El ID ya existe (no debería pasar, pero por seguridad)
+            console.error(`❌ CRÍTICO: ID ${nextId} ya existe en fila ${verification.foundAt}`)
+            console.error('❌ Esto NO debería pasar. Probablemente hay un problema de concurrencia.')
+            
+            toast.error(
+              `⚠️ Hubo un problema con el ID #${nextId} (ya está en uso). Por favor, intenta crear el pedido nuevamente haciendo clic en "Crear Pedido".`,
+              {
+                autoClose: 8000,
+                closeButton: true
+              }
+            )
+            
+            // Log del problema para debugging
+            await logToCSV('id_conflict_detected', {
+              attemptedId: nextId,
+              foundAt: verification.foundAt,
+              timestamp: new Date().toISOString()
+            }, 'error')
+            
+            setSubmitting(false)
+            return // DETENER la creación
+          }
+          
+          console.log(`✅ ID ${nextId} verificado como disponible, procediendo a crear...`)
+        } catch (verifyError) {
+          console.error('❌ Error verificando ID:', verifyError)
+          toast.error('No se pudo verificar el ID. Por favor, intenta nuevamente.')
+          setSubmitting(false)
+          return
+        }
+        
+        showNotification('🔄 Creando pedido...', 'info')
         
         // Normalizar la fecha al formato estándar DD/MM/YYYY
         // Si está vacía, usar fecha de hoy como fallback
