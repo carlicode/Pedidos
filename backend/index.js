@@ -1714,28 +1714,17 @@ app.post('/api/orders', async (req, res) => {
       if (ids[i] && String(sheetId) === String(orderId)) {
         if (existingRowIndex === -1) {
           existingRowIndex = i + 1 // +1 porque las filas de Google Sheets empiezan en 1
-          console.log(`✅ Encontrado pedido existente en fila ${existingRowIndex}`)
+          console.log(`⚠️ ID ${orderId} ya existe en fila ${existingRowIndex} - NO DEBERÍA PASAR EN POST`)
         }
         duplicateCount++
       }
     }
     
-    // Si hay duplicados pero no es una actualización, generar nuevo ID
-    if (duplicateCount > 0 && existingRowIndex === -1) {
-      console.log(`⚠️ ID ${orderId} ya existe ${duplicateCount} veces, generando nuevo ID...`)
-      
-      // Calcular nuevo ID basado en el máximo existente
-      const numericIds = ids.slice(1).map(row => {
-        const id = parseInt(String(row[0]).trim())
-        return isNaN(id) ? 0 : id
-      }).filter(id => id > 0)
-      
-      const newId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1
-      // Actualizar tanto order.id como order.ID
-      order.id = newId.toString()
-      order.ID = newId.toString()
-      console.log(`🆕 Nuevo ID asignado: ${newId}`)
-    }
+    // NOTA: Esta lógica ya no se usa porque ahora manejamos duplicados más abajo
+    // Mantenemos el código comentado para referencia
+    // if (duplicateCount > 0 && existingRowIndex === -1) {
+    //   console.log(`⚠️ ID ${orderId} ya existe ${duplicateCount} veces, generando nuevo ID...`)
+    // }
     
     if (existingRowIndex === -1) {
       console.log('❌ No se encontró pedido existente, se agregará como nuevo')
@@ -1746,18 +1735,38 @@ app.post('/api/orders', async (req, res) => {
     console.log(`📏 Número de columnas: ${row.length} (HEADER_ORDER: ${HEADER_ORDER.length})`)
     console.log(`📋 Columnas en HEADER_ORDER: ${HEADER_ORDER.join(', ')}`)
 
+    // CRÍTICO: POST /api/orders solo debe CREAR, nunca actualizar
+    // Si el ID ya existe, generar uno nuevo en lugar de sobrescribir
     if (existingRowIndex > 0) {
-      // Actualizar fila existente
-      // HEADER_ORDER tiene 31 columnas (A hasta AE)
-      await sheets.spreadsheets.values.update({
+      console.warn(`⚠️ ADVERTENCIA: ID ${orderId} ya existe en fila ${existingRowIndex}`)
+      console.warn(`⚠️ Esto NO debería pasar. Generando nuevo ID...`)
+      
+      // Generar nuevo ID basado en el máximo existente
+      const numericIds = ids.slice(1).map(row => {
+        const id = parseInt(String(row[0]).trim())
+        return isNaN(id) ? 0 : id
+      }).filter(id => id > 0)
+      
+      const newId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 1
+      order.id = newId.toString()
+      order.ID = newId.toString()
+      
+      console.log(`🆕 Nuevo ID asignado para evitar sobrescribir: ${newId}`)
+      
+      // Reconstruir fila con nuevo ID
+      const newRow = buildRow(order)
+      
+      // Agregar como nueva fila
+      await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
-        range: `${quoted}!A${existingRowIndex}:AE${existingRowIndex}`,
-        valueInputOption: 'RAW', // RAW para evitar que Google Sheets reinterprete las fechas
-        requestBody: { values: [row] }
+        range: `${quoted}!A:AE`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [newRow] }
       })
-      console.log(`✅ Updated existing order #${orderId} at row ${existingRowIndex}`)
+      console.log(`✅ Added order with NEW ID #${newId} (original was ${orderId})`)
     } else {
-      // Agregar nueva fila
+      // Agregar nueva fila (flujo normal)
       // HEADER_ORDER tiene 31 columnas (A hasta AE)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
