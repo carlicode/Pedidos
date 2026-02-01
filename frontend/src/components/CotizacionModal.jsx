@@ -3,8 +3,8 @@ import Icon from './Icon'
 import { toast } from 'react-toastify'
 import { getBackendUrl } from '../utils/api'
 import SearchableSelect from './SearchableSelect'
-import Papa from 'papaparse'
 import { calculatePrice } from '../utils/priceCalculator.js'
+import { loadEmpresas as loadEmpresasService } from '../services/clientesService.js'
 
 const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }) => {
   const [isVisible, setIsVisible] = useState(false)
@@ -197,43 +197,25 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
     }
   }
 
-  // Función para cargar empresas desde CSV
+  // Función para cargar empresas desde el backend
   const loadEmpresas = async () => {
     try {
-      const csvUrl = import.meta.env.VITE_EMPRESAS_CSV_URL || import.meta.env.VITE_CLIENTES_CSV_URL
-      if (!csvUrl) {
-        console.warn('⚠️ No hay URL configurada para empresas')
-        return
-      }
+      console.log('📋 Cargando empresas desde el backend...')
+      const empresasData = await loadEmpresasService()
       
-      const res = await fetch(csvUrl, { 
-        cache: 'no-store',
-        mode: 'cors',
-        headers: {
-          'Accept': 'text/csv'
-        }
-      })
+      console.log('✅ Empresas cargadas:', empresasData.length)
       
-      if (!res.ok) {
-        console.warn('⚠️ No se pudieron cargar las empresas')
-        return
-      }
+      // Transformar formato del servicio al formato que espera el componente
+      const empresasFormateadas = empresasData.map(emp => ({
+        empresa: emp.Empresa || emp.empresa,
+        mapa: emp.Mapa || emp.mapa || '',
+        descripcion: emp['Descripción'] || emp.descripcion || emp.Descripcion || ''
+      }))
       
-      const csvText = await res.text()
-      const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
-      
-      // Cargar empresas con sus mapas
-      const empresasData = parsed.data
-        .filter(row => row.Empresa?.trim() && row.Mapa?.trim())
-        .map(row => ({
-          empresa: row.Empresa.trim(),
-          mapa: row.Mapa.trim(),
-          descripcion: row.Descripción?.trim() || ''
-        }))
-      
-      setEmpresas(empresasData)
+      setEmpresas(empresasFormateadas)
     } catch (error) {
       console.error('❌ Error cargando empresas:', error)
+      toast.error('⚠️ No se pudieron cargar las empresas')
     }
   }
 

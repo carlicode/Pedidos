@@ -4896,35 +4896,37 @@ app.use((err, req, res, next) => {
   })
 })
 
-// Endpoint para obtener clientes y empresas desde las URLs de CSV
+// Endpoint para obtener clientes y empresas desde Google Sheet
 app.get('/api/clientes-empresas', async (req, res) => {
   try {
-    console.log('📋 Cargando clientes y empresas desde CSVs...')
+    console.log('📋 Cargando clientes y empresas desde Google Sheet...')
     
-    const empresasCsvUrl = process.env.VITE_EMPRESAS_CSV_URL
-    const clientesCsvUrl = process.env.VITE_CLIENTES_CSV_URL
+    // ID del Google Sheet de clientes/empresas
+    const EMPRESAS_SHEET_ID = '1AAGin-qSutQN42SlRaIbcooec7iKBn_l1QblROrI0Ok'
+    const empresasSheetName = 'Clientes'
     
-    if (!empresasCsvUrl && !clientesCsvUrl) {
+    if (!EMPRESAS_SHEET_ID) {
       return res.status(400).json({
         success: false,
-        error: 'URLs de CSV no configuradas en variables de entorno'
+        error: 'EMPRESAS_SHEET_ID no configurado'
       })
     }
     
-    // Usar la URL de empresas o clientes (lo que esté disponible)
-    const csvUrl = empresasCsvUrl || clientesCsvUrl
+    const auth = await getAuthClient()
+    await auth.authorize()
+    const sheets = google.sheets({ version: 'v4', auth })
     
-    // Hacer fetch del CSV
-    const response = await fetch(csvUrl)
-    if (!response.ok) {
-      throw new Error(`Error al obtener CSV: ${response.statusText}`)
-    }
+    const quoted = quoteSheet(empresasSheetName)
     
-    const csvText = await response.text()
+    // Leer datos del sheet (columnas A a E: Fecha, Operador, Empresa, Mapa, Descripción)
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: EMPRESAS_SHEET_ID,
+      range: `${quoted}!A:E`
+    })
     
-    // Parsear CSV simple (asumiendo formato: header en primera línea, datos en siguientes)
-    const lines = csvText.split('\n').filter(line => line.trim())
-    if (lines.length === 0) {
+    const rows = response.data.values || []
+    
+    if (rows.length === 0) {
       return res.json({
         success: true,
         empresas: [],
@@ -4932,31 +4934,27 @@ app.get('/api/clientes-empresas', async (req, res) => {
       })
     }
     
-    // Parsear headers
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+    // La primera fila son los headers (Fecha, Operador, Empresa, Mapa, Descripción)
+    const dataRows = rows.slice(1)
     
-    // Encontrar índices de columnas
-    const empresaIdx = headers.findIndex(h => h.toLowerCase() === 'empresa')
-    const mapaIdx = headers.findIndex(h => h.toLowerCase() === 'mapa')
-    const descripcionIdx = headers.findIndex(h => h.toLowerCase().includes('descripci'))
-    
-    // Parsear datos
     const empresasData = []
     const clientesSet = new Set()
     
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+    // Parsear datos
+    for (const row of dataRows) {
+      const empresa = row[2] || '' // Columna C: Empresa
+      const mapa = row[3] || ''     // Columna D: Mapa
+      const descripcion = row[4] || '' // Columna E: Descripción
       
-      if (empresaIdx >= 0 && values[empresaIdx]) {
-        const empresa = values[empresaIdx]
-        clientesSet.add(empresa)
+      if (empresa.trim()) {
+        clientesSet.add(empresa.trim())
         
         // Si tiene mapa, agregarlo a empresas
-        if (mapaIdx >= 0 && values[mapaIdx]) {
+        if (mapa.trim()) {
           empresasData.push({
-            empresa: empresa,
-            mapa: values[mapaIdx],
-            descripcion: descripcionIdx >= 0 ? (values[descripcionIdx] || '') : ''
+            Empresa: empresa.trim(),
+            Mapa: mapa.trim(),
+            Descripción: descripcion.trim()
           })
         }
       }
@@ -4964,7 +4962,7 @@ app.get('/api/clientes-empresas', async (req, res) => {
     
     const clientes = Array.from(clientesSet).sort()
     
-    console.log(`✅ Cargados ${clientes.length} clientes y ${empresasData.length} empresas`)
+    console.log(`✅ Cargados ${clientes.length} clientes y ${empresasData.length} empresas desde Google Sheet`)
     
     res.json({
       success: true,
@@ -4976,7 +4974,7 @@ app.get('/api/clientes-empresas', async (req, res) => {
     console.error('❌ Error cargando clientes y empresas:', error)
     res.status(500).json({
       success: false,
-      error: 'Error cargando datos',
+      error: 'Error cargando datos desde Google Sheet',
       details: error.message
     })
   }
