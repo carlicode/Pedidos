@@ -4903,7 +4903,7 @@ app.get('/api/clientes-empresas', async (req, res) => {
     
     // ID del Google Sheet de clientes/empresas
     const EMPRESAS_SHEET_ID = '1AAGin-qSutQN42SlRaIbcooec7iKBn_l1QblROrI0Ok'
-    const empresasSheetName = 'Clientes'
+    const empresasSheetName = 'Empresas' // CORREGIDO: Leer de la pestaña "Empresas" no "Clientes"
     
     if (!EMPRESAS_SHEET_ID) {
       return res.status(400).json({
@@ -4949,14 +4949,13 @@ app.get('/api/clientes-empresas', async (req, res) => {
       if (empresa.trim()) {
         clientesSet.add(empresa.trim())
         
-        // Si tiene mapa, agregarlo a empresas
-        if (mapa.trim()) {
-          empresasData.push({
-            Empresa: empresa.trim(),
-            Mapa: mapa.trim(),
-            Descripción: descripcion.trim()
-          })
-        }
+        // Agregar TODAS las empresas al array (con o sin mapa)
+        // Esto permite que aparezcan en el dropdown de empresas
+        empresasData.push({
+          Empresa: empresa.trim(),
+          Mapa: mapa.trim(), // Puede estar vacío
+          Descripción: descripcion.trim()
+        })
       }
     }
     
