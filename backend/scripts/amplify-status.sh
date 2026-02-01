@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script para ver el ESTADO de la app de Amplify
 
-APP_ID="d3bpt5tsbpx0os"
+APP_ID="d3i6av0lx664fk"
 REGION="us-east-1"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -55,7 +55,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "🌐 URLs:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "App: https://master.d3bpt5tsbpx0os.amplifyapp.com"
+echo "App: https://master.d3i6av0lx664fk.amplifyapp.com"
 echo "Console: https://console.aws.amazon.com/amplify/home?region=$REGION#/$APP_ID"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

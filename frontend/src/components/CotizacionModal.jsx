@@ -14,7 +14,7 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
     direccion_recojo: '',
     entrega: '',
     direccion_entrega: '',
-    medio_transporte: ''
+    medio_transporte: 'Bicicleta' // Por defecto Bicicleta
   })
   const [distancia, setDistancia] = useState(null)
   const [precio, setPrecio] = useState(null)
@@ -80,7 +80,7 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
           direccion_recojo: '',
           entrega: '',
           direccion_entrega: '',
-          medio_transporte: ''
+          medio_transporte: 'Bicicleta' // Por defecto Bicicleta
         })
         setDistancia(null)
         setPrecio(null)
@@ -399,8 +399,9 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
       }, 500)
     }
 
-    // Si cambia el medio de transporte y ya hay distancia, recalcular precio
+    // Si cambia el medio de transporte y ya hay distancia, recalcular precio automáticamente
     if (name === 'medio_transporte' && distancia) {
+      console.log('💰 Recalculando precio por cambio de transporte:', value, 'distancia:', distancia)
       calcularPrecio(distancia, value)
     }
   }
@@ -479,13 +480,10 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
         setDistancia(distanciaKm)
         console.log('✅ Distancia calculada:', distanciaKm, 'km')
         
-        // Calcular precio automáticamente si hay medio de transporte
-        if (form.medio_transporte) {
-          console.log('💰 Calculando precio para:', form.medio_transporte, 'distancia:', distanciaKm)
-          calcularPrecio(distanciaKm, form.medio_transporte)
-        } else {
-          toast.info('Distancia calculada. Selecciona un medio de transporte para calcular el precio.')
-        }
+        // Calcular precio automáticamente con el medio de transporte actual (por defecto Bicicleta)
+        const medioActual = form.medio_transporte || 'Bicicleta'
+        console.log('💰 Calculando precio para:', medioActual, 'distancia:', distanciaKm)
+        calcularPrecio(distanciaKm, medioActual)
       } else {
         console.error('❌ No se pudo extraer la distancia de la respuesta:', data)
         toast.error('No se pudo calcular la distancia. Revisa la consola para más detalles.')
@@ -980,6 +978,30 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
             )}
           </div>
 
+          {/* Botón Calcular Distancia */}
+          <button
+            onClick={calcularDistancia}
+            disabled={!form.direccion_recojo || !form.direccion_entrega || isCalculating}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: form.direccion_recojo && form.direccion_entrega && !isCalculating ? 'var(--brand)' : 'var(--muted)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: form.direccion_recojo && form.direccion_entrega && !isCalculating ? 'pointer' : 'not-allowed',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            {isCalculating ? '⏳ Calculando...' : '🔄 Calcular Distancia'}
+          </button>
+
           {/* Medio de Transporte */}
           <div style={{ marginBottom: '20px' }}>
             <label
@@ -1008,7 +1030,6 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
                 color: 'var(--text)',
               }}
             >
-              <option value="">Seleccionar medio de transporte</option>
               {MEDIOS_TRANSPORTE.map((medio) => (
                 <option key={medio} value={medio}>
                   {medio}
@@ -1016,30 +1037,6 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
               ))}
             </select>
           </div>
-
-          {/* Botón Calcular Distancia */}
-          <button
-            onClick={calcularDistancia}
-            disabled={!form.direccion_recojo || !form.direccion_entrega || isCalculating}
-            style={{
-              width: '100%',
-              padding: '12px',
-                  backgroundColor: form.direccion_recojo && form.direccion_entrega && !isCalculating ? 'var(--brand)' : 'var(--muted)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: form.direccion_recojo && form.direccion_entrega && !isCalculating ? 'pointer' : 'not-allowed',
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-          >
-            {isCalculating ? '⏳ Calculando...' : '🔄 Calcular Distancia'}
-          </button>
 
           {/* Resultados - Solo mostrar después de calcular */}
           {distancia && (

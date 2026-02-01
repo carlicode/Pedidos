@@ -4,7 +4,7 @@
 
 set -e
 
-APP_ID="d3bpt5tsbpx0os"
+APP_ID="d3i6av0lx664fk"
 REGION="us-east-1"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -31,7 +31,7 @@ echo "✅ APP PAUSADA"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "La app sigue online en:"
-echo "   https://master.d3bpt5tsbpx0os.amplifyapp.com"
+echo "   https://master.d3i6av0lx664fk.amplifyapp.com"
 echo ""
 echo "Pero:"
 echo "   ❌ No se ejecutarán builds automáticos en push"

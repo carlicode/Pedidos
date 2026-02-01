@@ -4,7 +4,7 @@
 
 set -e
 
-APP_ID="d3bpt5tsbpx0os"
+APP_ID="d3i6av0lx664fk"
 REGION="us-east-1"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -13,7 +13,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "⚠️  ADVERTENCIA:"
 echo "   Esta acción eliminará COMPLETAMENTE la app de Amplify."
-echo "   - Se perderá la URL: https://master.d3bpt5tsbpx0os.amplifyapp.com"
+echo "   - Se perderá la URL: https://master.d3i6av0lx664fk.amplifyapp.com"
 echo "   - Se eliminarán todos los builds y logs"
 echo "   - Esta acción NO se puede deshacer"
 echo ""
