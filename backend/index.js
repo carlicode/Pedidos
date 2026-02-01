@@ -422,6 +422,15 @@ const HEADER_ORDER = [
   'Info. Adicional Entrega'      // Posición 30 ✅
 ]
 
+// Header para la hoja de Logs (mismas columnas + Operacion y Operacion-operador)
+const LOGS_HEADER_ORDER = [
+  ...HEADER_ORDER,
+  'Operacion',           // CREAR o EDITAR
+  'Operacion-operador'   // Nombre del operador que hizo la operación
+]
+
+const LOGS_SHEET_NAME = 'Logs'
+
 function quoteSheet(title) {
   return `'${String(title).replace(/'/g, "''")}'`
 }
@@ -593,6 +602,125 @@ function buildRow(order) {
   }
   
   return row
+}
+
+/**
+ * Función para escribir en la hoja de Logs
+ * Guarda la misma información que en Registros + Operacion y Operacion-operador
+ * @param {Object} sheets - Cliente de Google Sheets API
+ * @param {Object} order - Datos del pedido
+ * @param {string} operation - 'CREAR' o 'EDITAR'
+ * @param {string} operator - Nombre del operador que realiza la operación
+ */
+async function writeToLogsSheet(sheets, order, operation, operator) {
+  try {
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    console.log(`📝 [Logs] INICIO - Escribiendo en hoja de Logs`)
+    console.log(`   Operación: ${operation}`)
+    console.log(`   Operador: ${operator}`)
+    console.log(`   ID Pedido: ${order.ID || order.id}`)
+    console.log(`   SHEET_ID: ${SHEET_ID}`)
+    console.log(`   LOGS_SHEET_NAME: ${LOGS_SHEET_NAME}`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`)
+    
+    // Asegurarse de que la hoja Logs existe
+    console.log(`📋 [Logs] Verificando si existe hoja "${LOGS_SHEET_NAME}"...`)
+    await ensureSheetExists(sheets, SHEET_ID, LOGS_SHEET_NAME)
+    console.log(`✅ [Logs] Hoja "${LOGS_SHEET_NAME}" existe o fue creada`)
+    
+    const quotedLogs = quoteSheet(LOGS_SHEET_NAME)
+    console.log(`📋 [Logs] Nombre de hoja quoted: ${quotedLogs}`)
+    
+    // Verificar si el header existe, si no, crearlo
+    console.log(`📋 [Logs] Verificando header...`)
+    const headerResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${quotedLogs}!A1:AG1` // AG es la columna 33 (31 originales + 2 nuevas)
+    })
+    
+    const headerExists = headerResponse.data.values && headerResponse.data.values.length > 0
+    console.log(`📋 [Logs] Header existe: ${headerExists}`)
+    
+    if (!headerExists) {
+      // Crear header
+      console.log('📋 [Logs] Creando header en hoja de Logs...')
+      console.log(`📋 [Logs] Total columnas en header: ${LOGS_HEADER_ORDER.length}`)
+      console.log(`📋 [Logs] Primeras 5 columnas: ${LOGS_HEADER_ORDER.slice(0, 5).join(', ')}`)
+      console.log(`📋 [Logs] Últimas 2 columnas: ${LOGS_HEADER_ORDER.slice(-2).join(', ')}`)
+      
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${quotedLogs}!A1:AG1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [LOGS_HEADER_ORDER]
+        }
+      })
+      console.log('✅ [Logs] Header creado exitosamente')
+    }
+    
+    // Construir la fila usando buildRow (mismas columnas que Registros)
+    console.log(`📊 [Logs] Construyendo fila base con buildRow()...`)
+    const baseRow = buildRow(order)
+    console.log(`📊 [Logs] Fila base construida - Longitud: ${baseRow.length}`)
+    console.log(`📊 [Logs] Primeros 3 valores: ${baseRow.slice(0, 3).join(' | ')}`)
+    
+    // Agregar las 2 columnas adicionales
+    const logRow = [
+      ...baseRow,
+      operation,      // Columna AF: CREAR o EDITAR
+      operator        // Columna AG: Nombre del operador
+    ]
+    
+    console.log(`📊 [Logs] Fila completa para Logs - Longitud: ${logRow.length}`)
+    console.log(`📊 [Logs] Últimas 2 columnas: ${logRow.slice(-2).join(' | ')}`)
+    
+    // Agregar la fila a la hoja de Logs
+    console.log(`📊 [Logs] Enviando fila a Google Sheets...`)
+    const appendResponse = await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: `${quotedLogs}!A:AG`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: {
+        values: [logRow]
+      }
+    })
+    
+    console.log(`✅ [Logs] Respuesta de Google Sheets:`, {
+      updatedRange: appendResponse.data.updates?.updatedRange,
+      updatedRows: appendResponse.data.updates?.updatedRows,
+      updatedColumns: appendResponse.data.updates?.updatedColumns,
+      updatedCells: appendResponse.data.updates?.updatedCells
+    })
+    console.log(`✅ [Logs] Registro agregado exitosamente - Operación: ${operation}, ID: ${order.ID || order.id}`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`)
+    
+    return {
+      success: true,
+      operation,
+      operator,
+      updatedRange: appendResponse.data.updates?.updatedRange
+    }
+    
+  } catch (error) {
+    // NO lanzar error para no interrumpir la operación principal
+    console.error(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    console.error(`❌ [Logs] ERROR escribiendo en hoja de Logs`)
+    console.error(`   Operación: ${operation}`)
+    console.error(`   Operador: ${operator}`)
+    console.error(`   Error: ${error.message}`)
+    console.error(`   Stack:`, error.stack)
+    console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`)
+    
+    // Log el error pero continuar
+    return {
+      success: false,
+      error: error.message,
+      operation,
+      operator
+    }
+  }
 }
 
 // Función de geocoding como respaldo
@@ -1795,6 +1923,9 @@ app.post('/api/orders', async (req, res) => {
       })
       console.log(`✅ Added order with NEW ID #${newId} (original was ${orderId})`)
       
+      // 📝 LOGS: Escribir en hoja de Logs
+      await writeToLogsSheet(sheets, order, 'CREAR', order.Operador || order.operador || 'Desconocido')
+      
       // Registrar en audit log
       logAuditEntry('CREAR', order, {
         operator: order.Operador || order.operador,
@@ -1814,6 +1945,9 @@ app.post('/api/orders', async (req, res) => {
         requestBody: { values: [row] }
       })
       console.log(`✅ Added new order #${orderId}`)
+      
+      // 📝 LOGS: Escribir en hoja de Logs
+      await writeToLogsSheet(sheets, order, 'CREAR', order.Operador || order.operador || 'Desconocido')
       
       // Registrar en audit log
       logAuditEntry('CREAR', order, {
@@ -1903,23 +2037,45 @@ app.put('/api/orders/:id', async (req, res) => {
     
     const ids = response.data.values || []
     let rowIndex = -1
+    const matchingRows = [] // Array para detectar duplicados
     
-    // Buscar la fila que contiene el pedido
+    // Buscar TODAS las filas que contienen el pedido (detectar duplicados)
     for (let i = 1; i < ids.length; i++) { // Saltar header (i=0)
       const sheetId = ids[i] && ids[i][0]
       if (String(sheetId) === String(orderId)) {
-        rowIndex = i + 1 // +1 porque las filas de Google Sheets empiezan en 1
-        console.log(`✅ Encontrado pedido #${orderId} en fila ${rowIndex}`)
-        break
+        const foundRow = i + 1 // +1 porque las filas de Google Sheets empiezan en 1
+        matchingRows.push(foundRow)
+        console.log(`🔍 ID #${orderId} encontrado en fila ${foundRow}`)
       }
     }
     
-    if (rowIndex === -1) {
+    // CRÍTICO: Si hay múltiples filas con el mismo ID, es un error grave
+    if (matchingRows.length > 1) {
+      console.error(`🚨 CRÍTICO: ID #${orderId} está DUPLICADO en ${matchingRows.length} filas: ${matchingRows.join(', ')}`)
+      console.error(`🚨 Esto indica un problema en la base de datos que debe resolverse manualmente`)
+      console.error(`🚨 NO se puede actualizar de forma segura porque no sabemos cuál es el correcto`)
+      
+      return res.status(409).json({ 
+        success: false,
+        error: `ID #${orderId} está duplicado`,
+        message: `CRÍTICO: El ID #${orderId} aparece en ${matchingRows.length} filas diferentes (${matchingRows.join(', ')}). Esto es un error grave en la base de datos. Por favor, contacta al administrador para resolver los duplicados antes de editar este pedido.`,
+        duplicateRows: matchingRows,
+        code: 'DUPLICATE_ID_ERROR'
+      })
+    }
+    
+    if (matchingRows.length === 0) {
+      console.error(`❌ ID #${orderId} no encontrado en ninguna fila`)
       return res.status(404).json({ 
         success: false,
         error: `Pedido #${orderId} no encontrado` 
       })
     }
+    
+    // Si llegamos aquí, hay exactamente 1 coincidencia (lo correcto)
+    rowIndex = matchingRows[0]
+    console.log(`✅ Encontrado pedido #${orderId} en fila ${rowIndex} (sin duplicados)`)
+    
     
     // LEER LA FILA EXISTENTE primero para preservar datos que no se envían
     const existingRowResponse = await sheets.spreadsheets.values.get({
@@ -1938,11 +2094,22 @@ app.put('/api/orders/:id', async (req, res) => {
     // Construir nueva fila con buildRow
     const newRow = buildRow(order)
     
+    // CRÍTICO: FORZAR que el ID sea siempre el de la URL (req.params.id)
+    // NUNCA permitir que el body cambie el ID de un pedido existente
+    // Esto previene el bug donde se sobrescribe una carrera con un ID diferente
+    newRow[0] = orderId  // orderId viene de req.params.id (línea 1976)
+    console.log(`🔒 ID forzado a ${orderId} (ignorando cualquier ID del body para prevenir sobrescritura)`)
+    
     // Mezclar: mantener valores existentes si los nuevos están vacíos
     // Solo sobrescribir si el nuevo valor NO está vacío O si es un campo que queremos limpiar intencionalmente
     const mergedRow = newRow.map((newValue, index) => {
       const columnName = HEADER_ORDER[index]
       const existingValue = existingRow[index] || ''
+      
+      // PROTECCIÓN ADICIONAL: El ID (columna 0) SIEMPRE debe ser el de la URL
+      if (index === 0) {
+        return orderId  // Forzar ID correcto incluso después del merge
+      }
       
       // Campos que SÍ queremos poder vaciar intencionalmente (no preservar)
       // NOTA: "Detalles de la Carrera" REMOVIDO - nunca queremos borrar descripciones accidentalmente
@@ -1979,6 +2146,16 @@ app.put('/api/orders/:id', async (req, res) => {
     })
     console.log(`✅ Pedido #${orderId} actualizado exitosamente en fila ${rowIndex}`)
     console.log('═══════════════════════════════════════')
+    
+    // 📝 LOGS: Escribir en hoja de Logs (usar mergedRow para tener datos completos)
+    // Incluir el estado en la operación para que quede registrado cada transición (Pendiente → En carrera → Entregado/Cancelado)
+    const orderForLog = {}
+    HEADER_ORDER.forEach((header, index) => {
+      orderForLog[header] = mergedRow[index] || ''
+    })
+    const nuevoEstado = orderForLog['Estado'] || order.Estado || order.estado || ''
+    const operacionLog = nuevoEstado ? `EDITAR (${nuevoEstado})` : 'EDITAR'
+    await writeToLogsSheet(sheets, orderForLog, operacionLog, order.Operador || order.operador || 'Desconocido')
     
     // Registrar en audit log
     logAuditEntry('EDITAR', order, {

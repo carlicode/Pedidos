@@ -977,9 +977,15 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
 
   // Función para activar modo edición (reutiliza el formulario de agregar)
   const handleEditMode = (order) => {
-    setEditingOrder(order)
+    // CRÍTICO: Hacer una copia profunda del objeto para evitar mutaciones
+    // Esto previene bugs cuando:
+    // - Dos usuarios editan al mismo tiempo
+    // - El navegador tiene datos en caché
+    // - Se editan múltiples pedidos sin recargar
+    const orderCopy = JSON.parse(JSON.stringify(order))
+    setEditingOrder(orderCopy)
     setActiveTab('agregar')
-    showNotification(`✏️ Editando pedido #${order.id}`, 'info')
+    showNotification(`✏️ Editando pedido #${orderCopy.id}`, 'info')
   }
 
   // Función para cancelar modo edición
@@ -2957,6 +2963,48 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             message: updateError.message,
             stack: updateError.stack
           })
+          
+          // Manejar error específico de ID duplicado
+          try {
+            const errorData = await updateError.json?.() || {}
+            
+            if (errorData.code === 'DUPLICATE_ID_ERROR') {
+              // Error de ID duplicado - mostrar mensaje específico
+              console.error('🚨 CRÍTICO: ID duplicado detectado:', errorData)
+              
+              toast.error(
+                `🚨 ERROR CRÍTICO: El pedido #${updatedOrder.id} está DUPLICADO en múltiples filas (${errorData.duplicateRows?.join(', ')}). 
+                
+                Esto es un problema grave en la base de datos que debe resolverse antes de poder editar este pedido.
+                
+                Por favor, contacta al administrador del sistema inmediatamente.`,
+                {
+                  autoClose: false, // No cerrar automáticamente
+                  closeButton: true,
+                  style: {
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }
+                }
+              )
+              
+              // Log del problema para debugging
+              await logToCSV('duplicate_id_edit_blocked', {
+                orderId: updatedOrder.id,
+                duplicateRows: errorData.duplicateRows,
+                timestamp: new Date().toISOString()
+              }, 'error')
+              
+              setSubmitting(false)
+              return // NO continuar con la edición
+            }
+          } catch (parseError) {
+            // Si no se puede parsear el error, continuar con el flujo normal
+            console.error('No se pudo parsear el error:', parseError)
+          }
+          
           throw updateError
         }
         

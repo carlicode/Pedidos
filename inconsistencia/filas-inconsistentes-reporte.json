@@ -1,0 +1,1599 @@
+{
+  "generatedAt": "2026-02-01T07:56:11.165Z",
+  "csvFile": "/Users/carli.code/Desktop/Pedidos/inconsistencia/Pedidos Ecodelivery - Beezero - Septiembre - Registros.csv",
+  "totalDataRows": 1401,
+  "inconsistentCount": 101,
+  "duplicateIds": [],
+  "rows": [
+    {
+      "rowNumber": 86,
+      "id": "3555",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "16:16:44",
+      "operador": "Ale",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 26 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (05/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 129,
+      "id": "3598",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "14:32:37",
+      "operador": "Ale",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 25 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (06/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 194,
+      "id": "3663",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "08:20:56",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 23 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 199,
+      "id": "3668",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "08:34:49",
+      "operador": "Ale",
+      "cliente": "Vida Sana",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (16/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 204,
+      "id": "3673",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "08:21:11",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 23 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 207,
+      "id": "3676",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "08:21:16",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 21 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (28/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 209,
+      "id": "3678",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "08:51:23",
+      "operador": "Ana",
+      "cliente": "Optica El Rosario",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (16/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 218,
+      "id": "3687",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "12:51:23",
+      "operador": "Ana",
+      "cliente": "salud y belleza",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (16/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 228,
+      "id": "3697",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "08:36:52",
+      "operador": "Ana",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 23 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 284,
+      "id": "3753",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:31:44",
+      "operador": "Ale",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 13 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 285,
+      "id": "3754",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:32:54",
+      "operador": "Ale",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 13 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (07/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 296,
+      "id": "3765",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "13:21:51",
+      "operador": "Ale",
+      "cliente": "Salud y belleza",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (16/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 301,
+      "id": "3770",
+      "fechaRegistro": "08/01/2026",
+      "horaRegistro": "09:14:23",
+      "operador": "Ana",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 08/01/2026 difiere -8 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 302,
+      "id": "3771",
+      "fechaRegistro": "26/01/2026",
+      "horaRegistro": "09:14:24",
+      "operador": "Usuario",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 26/01/2026 difiere 18 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 303,
+      "id": "3772",
+      "fechaRegistro": "27/01/2026",
+      "horaRegistro": "09:14:26",
+      "operador": "Fabri",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 27/01/2026 difiere 19 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 304,
+      "id": "3773",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "09:14:28",
+      "operador": "Miguel",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 20 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 305,
+      "id": "3774",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "09:14:29",
+      "operador": "Ana",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 22 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 306,
+      "id": "3775",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:14:31",
+      "operador": "Ale",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 23 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 307,
+      "id": "3776",
+      "fechaRegistro": "08/01/2026",
+      "horaRegistro": "09:36:39",
+      "operador": "Ana",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 08/01/2026 difiere -12 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 312,
+      "id": "3781",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:17:55",
+      "operador": "Ale",
+      "cliente": "vida sana",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 358,
+      "id": "3827",
+      "fechaRegistro": "12/01/2026",
+      "horaRegistro": "18:15:31",
+      "operador": "Miguel",
+      "cliente": "Punto De Partida Forever",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 12/01/2026 difiere 4 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 360,
+      "id": "3829",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "18:22:09",
+      "operador": "Ale",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 19 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 361,
+      "id": "3830",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "18:22:26",
+      "operador": "Ale",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 19 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 362,
+      "id": "3831",
+      "fechaRegistro": "08/01/2026",
+      "horaRegistro": "16:02:06",
+      "operador": "Fabri",
+      "cliente": "70752062",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 08/01/2026 difiere -4 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 363,
+      "id": "3832",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:26:03",
+      "operador": "Ale",
+      "cliente": "70705594",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 364,
+      "id": "3833",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:29:13",
+      "operador": "Ale",
+      "cliente": "clariza cordova",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 366,
+      "id": "3835",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:32:46",
+      "operador": "Ale",
+      "cliente": "SOVRANO",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (08/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 379,
+      "id": "3848",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:36:55",
+      "operador": "Ale",
+      "cliente": "Kdbol",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (09/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 386,
+      "id": "3855",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:15:39",
+      "operador": "Ale",
+      "cliente": "PALETTA FABRICA Frutillar",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (09/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 387,
+      "id": "3856",
+      "fechaRegistro": "09/01/2026",
+      "horaRegistro": "11:11:53",
+      "operador": "Ana",
+      "cliente": "El Hogar de las vitaminas",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 09/01/2026 difiere -11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 389,
+      "id": "3858",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:46:55",
+      "operador": "Ale",
+      "cliente": "Ecobebe",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (12/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 397,
+      "id": "3866",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "11:21:25",
+      "operador": "Ale",
+      "cliente": "Casa David hinojosa",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 22 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (09/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 402,
+      "id": "3871",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:00:54",
+      "operador": "Ale",
+      "cliente": "Podarte oficina sr",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 403,
+      "id": "3872",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:03:37",
+      "operador": "Ale",
+      "cliente": "Lab Bioniza",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 404,
+      "id": "3873",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:07:07",
+      "operador": "Ale",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 405,
+      "id": "3874",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:12:09",
+      "operador": "Ale",
+      "cliente": "Aiko",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (09/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 429,
+      "id": "3898",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:03:31",
+      "operador": "Ale",
+      "cliente": "Aldeas SOS",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 430,
+      "id": "3899",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:04:39",
+      "operador": "Ale",
+      "cliente": "BOURBONERIA SALAMANCA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 431,
+      "id": "3900",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:05:53",
+      "operador": "Ale",
+      "cliente": "SIE S.A",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 432,
+      "id": "3901",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:06:54",
+      "operador": "Ale",
+      "cliente": "SIE S.A",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 433,
+      "id": "3902",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:08:07",
+      "operador": "Ale",
+      "cliente": "Encanta Libros",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 443,
+      "id": "3912",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "08:56:04",
+      "operador": "Ale",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 21 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 449,
+      "id": "3918",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "08:30:22",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 20 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 451,
+      "id": "3920",
+      "fechaRegistro": "26/01/2026",
+      "horaRegistro": "08:30:25",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 26/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 452,
+      "id": "3921",
+      "fechaRegistro": "27/01/2026",
+      "horaRegistro": "08:30:26",
+      "operador": "Fabri",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 27/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (27/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 453,
+      "id": "3922",
+      "fechaRegistro": "10/01/2026",
+      "horaRegistro": "08:30:28",
+      "operador": "Ale",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 10/01/2026 difiere -6 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 454,
+      "id": "3923",
+      "fechaRegistro": "29/01/2026",
+      "horaRegistro": "08:30:29",
+      "operador": "Ana",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 29/01/2026 difiere 13 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (29/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 455,
+      "id": "3924",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "08:58:57",
+      "operador": "Ana",
+      "cliente": "La dietetica",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 6 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 456,
+      "id": "3925",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "08:30:32",
+      "operador": "Fabri",
+      "cliente": "La Marraqueta Eco Sandwich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 21 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 463,
+      "id": "3932",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:05:35",
+      "operador": "Ale",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 21 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 468,
+      "id": "3937",
+      "fechaRegistro": "22/01/2026",
+      "horaRegistro": "23:47:42",
+      "operador": "Ale",
+      "cliente": "BOURBONERIA SALAMANCA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 22/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (22/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 474,
+      "id": "3943",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "12:32:28",
+      "operador": "Ana",
+      "cliente": "Lab de patología ciudad colonial",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere 6 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (16/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 482,
+      "id": "3951",
+      "fechaRegistro": "24/01/2026",
+      "horaRegistro": "10:32:29",
+      "operador": "Ale",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 24/01/2026 difiere 14 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (24/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 484,
+      "id": "3953",
+      "fechaRegistro": "26/01/2026",
+      "horaRegistro": "10:32:32",
+      "operador": "Ana",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 26/01/2026 difiere 16 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 485,
+      "id": "3954",
+      "fechaRegistro": "27/01/2026",
+      "horaRegistro": "10:32:33",
+      "operador": "Ana",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 27/01/2026 difiere 7 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 486,
+      "id": "3955",
+      "fechaRegistro": "29/01/2026",
+      "horaRegistro": "10:32:35",
+      "operador": "Ana",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 29/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 487,
+      "id": "3956",
+      "fechaRegistro": "29/01/2026",
+      "horaRegistro": "10:32:36",
+      "operador": "Ana",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 29/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (29/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 488,
+      "id": "3957",
+      "fechaRegistro": "10/01/2026",
+      "horaRegistro": "10:37:05",
+      "operador": "Ale",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 10/01/2026 difiere -10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 489,
+      "id": "3958",
+      "fechaRegistro": "10/01/2026",
+      "horaRegistro": "10:43:48",
+      "operador": "Ale",
+      "cliente": "Libreria \"AZUL Stacionary\"",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 10/01/2026 difiere -10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 491,
+      "id": "3960",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "21:24:06",
+      "operador": "Ale",
+      "cliente": "Aldeas SOS",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 492,
+      "id": "3961",
+      "fechaRegistro": "10/01/2026",
+      "horaRegistro": "10:48:21",
+      "operador": "Ale",
+      "cliente": "Optiluz Eliseo maita",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 10/01/2026 difiere -10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 495,
+      "id": "3964",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:00:06",
+      "operador": "Ale",
+      "cliente": "Sacred Sex",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 496,
+      "id": "3965",
+      "fechaRegistro": "10/01/2026",
+      "horaRegistro": "10:55:05",
+      "operador": "Ale",
+      "cliente": "Lab. Santiago",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 10/01/2026 difiere -10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 497,
+      "id": "3966",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:21:16",
+      "operador": "Ale",
+      "cliente": "Aldeas SOS",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 498,
+      "id": "3967",
+      "fechaRegistro": "20/01/2026",
+      "horaRegistro": "22:21:56",
+      "operador": "Ale",
+      "cliente": "Aldeas SOS",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 20/01/2026 difiere 8 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (20/01/2026) es posterior a la siguiente fila (10/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 528,
+      "id": "3997",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "13:42:11",
+      "operador": "Ale",
+      "cliente": "Bourboneria: heroinas (Centro de produccion)",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 19 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (12/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 723,
+      "id": "4192",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:28:34",
+      "operador": "Ana",
+      "cliente": "Lab Bioniza",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 724,
+      "id": "4193",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:21:25",
+      "operador": "Ana",
+      "cliente": "OPTIMED",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 725,
+      "id": "4194",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:23:10",
+      "operador": "Ana",
+      "cliente": "Punto De Partida Forever",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (28/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 741,
+      "id": "4210",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:16:46",
+      "operador": "Ale",
+      "cliente": "Chocolateria Taboada",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 15 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 743,
+      "id": "4212",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:18:14",
+      "operador": "Ale",
+      "cliente": "Chocolateria Taboada",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 15 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 744,
+      "id": "4213",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:19:06",
+      "operador": "Ale",
+      "cliente": "Chocolateria Taboada",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 15 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 745,
+      "id": "4214",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:19:54",
+      "operador": "Ale",
+      "cliente": "Chocolateria Taboada",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 15 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 746,
+      "id": "4215",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "09:20:36",
+      "operador": "Ale",
+      "cliente": "Chocolateria Taboada",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 15 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 766,
+      "id": "4235",
+      "fechaRegistro": "21/01/2026",
+      "horaRegistro": "12:45:52",
+      "operador": "Miguel",
+      "cliente": "Zurich",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 21/01/2026 difiere 5 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 767,
+      "id": "4236",
+      "fechaRegistro": "21/01/2026",
+      "horaRegistro": "12:48:01",
+      "operador": "Miguel",
+      "cliente": "Optilook",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 21/01/2026 difiere 5 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 768,
+      "id": "4237",
+      "fechaRegistro": "21/01/2026",
+      "horaRegistro": "12:48:26",
+      "operador": "Ana",
+      "cliente": "Optilook",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 21/01/2026 difiere 5 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (21/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 812,
+      "id": "4281",
+      "fechaRegistro": "29/01/2026",
+      "horaRegistro": "10:44:25",
+      "operador": "Ana",
+      "cliente": "otro - 65332646",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (29/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 813,
+      "id": "4282",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:32:34",
+      "operador": "Ale",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -12 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 814,
+      "id": "4283",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:33:59",
+      "operador": "Ale",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -12 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 816,
+      "id": "4285",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:02:11",
+      "operador": "Miguel",
+      "cliente": "Totto Aranjuez",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (28/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 817,
+      "id": "4286",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:35:10",
+      "operador": "Fabri",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 818,
+      "id": "4287",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:35:11",
+      "operador": "Miguel",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 819,
+      "id": "4288",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "23:35:13",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (24/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 822,
+      "id": "4291",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "23:35:18",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 4 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 823,
+      "id": "4292",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "23:35:19",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (16/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 824,
+      "id": "4293",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:36:05",
+      "operador": "Fabri",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 825,
+      "id": "4294",
+      "fechaRegistro": "16/01/2026",
+      "horaRegistro": "23:36:07",
+      "operador": "Miguel",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 16/01/2026 difiere -11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 826,
+      "id": "4295",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "23:36:09",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (24/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 829,
+      "id": "4298",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "23:36:17",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 830,
+      "id": "4299",
+      "fechaRegistro": "29/01/2026",
+      "horaRegistro": "23:36:19",
+      "operador": "Ana",
+      "cliente": "PROMOVIL OFICINA",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 29/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (29/01/2026) es posterior a la siguiente fila (17/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 854,
+      "id": "4323",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:54:21",
+      "operador": "Ana",
+      "cliente": "OPTICA CONCEPCION",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 10 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 855,
+      "id": "4324",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "12:07:43",
+      "operador": "Miguel",
+      "cliente": "Totto Hupermall",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 9 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (28/01/2026) es posterior a la siguiente fila (18/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 864,
+      "id": "4333",
+      "fechaRegistro": "30/01/2026",
+      "horaRegistro": "09:08:30",
+      "operador": "Ana",
+      "cliente": "Rosmery Llaveta",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 30/01/2026 difiere 11 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (30/01/2026) es posterior a la siguiente fila (19/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 914,
+      "id": "4383",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "17:36:20",
+      "operador": "Ale",
+      "cliente": "Qhathu",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 12 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (19/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 1056,
+      "id": "4525",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:38:37",
+      "operador": "Ale",
+      "cliente": "La Estancia",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 6 días de la mediana de la ventana (5 filas antes/después)"
+        }
+      ]
+    },
+    {
+      "rowNumber": 1057,
+      "id": "4526",
+      "fechaRegistro": "28/01/2026",
+      "horaRegistro": "11:43:18",
+      "operador": "Ana",
+      "cliente": "Ecodelivery",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 28/01/2026 difiere 6 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (28/01/2026) es posterior a la siguiente fila (22/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 1077,
+      "id": "4546",
+      "fechaRegistro": "",
+      "horaRegistro": "",
+      "operador": "Carli",
+      "cliente": "América Unificado",
+      "reasons": [
+        {
+          "rule": "FECHA_VACIA",
+          "detail": "Sin Fecha Registro"
+        }
+      ]
+    },
+    {
+      "rowNumber": 1126,
+      "id": "4595",
+      "fechaRegistro": "",
+      "horaRegistro": "",
+      "operador": "",
+      "cliente": "",
+      "reasons": [
+        {
+          "rule": "FECHA_VACIA",
+          "detail": "Sin Fecha Registro"
+        }
+      ]
+    },
+    {
+      "rowNumber": 1187,
+      "id": "4656",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "11:32:49",
+      "operador": "Ale",
+      "cliente": "Laboratorio Central",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 4 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (27/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    },
+    {
+      "rowNumber": 1212,
+      "id": "4681",
+      "fechaRegistro": "31/01/2026",
+      "horaRegistro": "14:31:44",
+      "operador": "Ale",
+      "cliente": "SIE S.A",
+      "reasons": [
+        {
+          "rule": "FECHA_INCONSISTENTE",
+          "detail": "Fecha 31/01/2026 difiere 4 días de la mediana de la ventana (5 filas antes/después)"
+        },
+        {
+          "rule": "FECHA_INVERTIDA",
+          "detail": "Fecha (31/01/2026) es posterior a la siguiente fila (27/01/2026). Posible fila reemplazada o insertada."
+        }
+      ]
+    }
+  ]
+}

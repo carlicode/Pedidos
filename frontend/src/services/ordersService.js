@@ -330,6 +330,24 @@ export const updateOrderInSheet = async (order) => {
   // Esto garantiza que TODOS los campos (incluido biker) se formateen correctamente
   const filteredOrder = filterOrderForSheet(order)
   
+  // VALIDACIÓN CRÍTICA: Asegurar que el ID del body coincida con el de la URL
+  // Esto previene el bug donde se envía un ID diferente y se sobrescribe otra carrera
+  const urlId = String(order.id)
+  const bodyId = String(filteredOrder[SHEET_COLUMNS.ID] || filteredOrder.ID || filteredOrder.id)
+  
+  if (urlId !== bodyId) {
+    console.error('🚨 ERROR CRÍTICO: ID mismatch detectado!', {
+      urlId,
+      bodyId,
+      order,
+      filteredOrder
+    })
+    throw new Error(`Error interno: ID en URL (${urlId}) no coincide con ID en body (${bodyId}). Por favor recarga la página.`)
+  }
+  
+  // Forzar que el ID sea el correcto (por si acaso)
+  filteredOrder[SHEET_COLUMNS.ID] = urlId
+  
   const res = await fetch(updateUrl, {
     method: 'PUT',
     headers: {
@@ -342,8 +360,28 @@ export const updateOrderInSheet = async (order) => {
     const responseData = await res.json()
     return { success: true, data: responseData }
   } else {
-    const errorText = await res.text()
-    throw new Error(`Error ${res.status}: ${errorText}`)
+    // Intentar obtener el mensaje de error del servidor
+    let errorData
+    try {
+      errorData = await res.json()
+    } catch (e) {
+      // Si no se puede parsear como JSON, usar texto plano
+      const errorText = await res.text()
+      throw new Error(`Error ${res.status}: ${errorText}`)
+    }
+    
+    // Si es un error de ID duplicado (409), lanzar error especial
+    if (res.status === 409 && errorData.code === 'DUPLICATE_ID_ERROR') {
+      const error = new Error(errorData.message || `ID #${order.id} está duplicado`)
+      error.code = errorData.code
+      error.duplicateRows = errorData.duplicateRows
+      error.status = 409
+      error.json = async () => errorData // Agregar método json() para que se pueda parsear en el catch
+      throw error
+    }
+    
+    // Para otros errores
+    throw new Error(`Error ${res.status}: ${errorData.error || errorData.message || 'Error desconocido'}`)
   }
 }
 
