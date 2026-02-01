@@ -4896,14 +4896,13 @@ app.use((err, req, res, next) => {
   })
 })
 
-// Endpoint para obtener clientes y empresas desde Google Sheet
+// Endpoint para obtener clientes y empresas desde las URLs de CSV
 app.get('/api/clientes-empresas', async (req, res) => {
   try {
-    console.log('📋 Cargando clientes y empresas desde Google Sheet...')
+    console.log('📋 Cargando clientes y empresas desde Google Sheets...')
     
     // ID del Google Sheet de clientes/empresas
     const EMPRESAS_SHEET_ID = '1AAGin-qSutQN42SlRaIbcooec7iKBn_l1QblROrI0Ok'
-    const empresasSheetName = 'Empresas' // CORREGIDO: Leer de la pestaña "Empresas" no "Clientes"
     
     if (!EMPRESAS_SHEET_ID) {
       return res.status(400).json({
@@ -4916,64 +4915,114 @@ app.get('/api/clientes-empresas', async (req, res) => {
     await auth.authorize()
     const sheets = google.sheets({ version: 'v4', auth })
     
-    const quoted = quoteSheet(empresasSheetName)
+    // Leer ambas pestañas: Empresas y Clientes
+    const empresasSheetName = 'Empresas'
+    const clientesSheetName = 'Clientes'
     
-    // Leer datos del sheet (columnas A a E: Fecha, Operador, Empresa, Mapa, Descripción)
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: EMPRESAS_SHEET_ID,
-      range: `${quoted}!A:E`
+    const quotedEmpresas = quoteSheet(empresasSheetName)
+    const quotedClientes = quoteSheet(clientesSheetName)
+    
+    console.log('🔍 Leyendo pestaña Empresas:', empresasSheetName)
+    console.log('🔍 Leyendo pestaña Clientes:', clientesSheetName)
+    
+    // Leer pestaña Empresas
+    let empresasData = []
+    try {
+      const empresasResult = await sheets.spreadsheets.values.get({
+        spreadsheetId: EMPRESAS_SHEET_ID,
+        range: `${quotedEmpresas}!A:E`  // Fecha, Operador, Empresa, Mapa, Descripción
+      })
+      
+      const empresasRows = empresasResult.data.values || []
+      
+      if (empresasRows.length > 1) {
+        // Saltar la fila de encabezados
+        for (let i = 1; i < empresasRows.length; i++) {
+          const row = empresasRows[i]
+          const empresa = row[2] ? row[2].trim() : ''  // Columna C: Empresa
+          const mapa = row[3] ? row[3].trim() : ''     // Columna D: Mapa
+          const descripcion = row[4] ? row[4].trim() : '' // Columna E: Descripción
+          
+          if (empresa) {
+            empresasData.push({
+              empresa: empresa,
+              mapa: mapa,
+              descripcion: descripcion
+            })
+          }
+        }
+      }
+      
+      console.log(`✅ Cargadas ${empresasData.length} empresas desde pestaña Empresas`)
+    } catch (error) {
+      console.warn('⚠️ No se pudo leer la pestaña Empresas:', error.message)
+    }
+    
+    // Leer pestaña Clientes
+    let clientesData = []
+    try {
+      const clientesResult = await sheets.spreadsheets.values.get({
+        spreadsheetId: EMPRESAS_SHEET_ID,
+        range: `${quotedClientes}!A:H`  // Todas las columnas de Clientes
+      })
+      
+      const clientesRows = clientesResult.data.values || []
+      
+      if (clientesRows.length > 1) {
+        // Saltar la fila de encabezados
+        for (let i = 1; i < clientesRows.length; i++) {
+          const row = clientesRows[i]
+          const empresa = row[2] ? row[2].trim() : ''  // Columna C: Empresa
+          const mapa = row[3] ? row[3].trim() : ''     // Columna D: Mapa
+          const descripcion = row[4] ? row[4].trim() : '' // Columna E: Descripción
+          
+          if (empresa) {
+            // Agregar a empresasData si tiene mapa
+            if (mapa) {
+              empresasData.push({
+                empresa: empresa,
+                mapa: mapa,
+                descripcion: descripcion
+              })
+            }
+            
+            // Agregar a lista de clientes
+            clientesData.push(empresa)
+          }
+        }
+      }
+      
+      console.log(`✅ Cargados ${clientesData.length} clientes desde pestaña Clientes`)
+    } catch (error) {
+      console.warn('⚠️ No se pudo leer la pestaña Clientes:', error.message)
+    }
+    
+    // Eliminar duplicados de empresas
+    const empresasUnicas = []
+    const empresasSet = new Set()
+    empresasData.forEach(emp => {
+      if (!empresasSet.has(emp.empresa)) {
+        empresasSet.add(emp.empresa)
+        empresasUnicas.push(emp)
+      }
     })
     
-    const rows = response.data.values || []
+    // Eliminar duplicados y ordenar clientes
+    const clientesUnicos = Array.from(new Set(clientesData)).sort()
     
-    if (rows.length === 0) {
-      return res.json({
-        success: true,
-        empresas: [],
-        clientes: []
-      })
-    }
-    
-    // La primera fila son los headers (Fecha, Operador, Empresa, Mapa, Descripción)
-    const dataRows = rows.slice(1)
-    
-    const empresasData = []
-    const clientesSet = new Set()
-    
-    // Parsear datos
-    for (const row of dataRows) {
-      const empresa = row[2] || '' // Columna C: Empresa
-      const mapa = row[3] || ''     // Columna D: Mapa
-      const descripcion = row[4] || '' // Columna E: Descripción
-      
-      if (empresa.trim()) {
-        clientesSet.add(empresa.trim())
-        
-        // Agregar TODAS las empresas al array (con o sin mapa)
-        // Esto permite que aparezcan en el dropdown de empresas
-        empresasData.push({
-          Empresa: empresa.trim(),
-          Mapa: mapa.trim(), // Puede estar vacío
-          Descripción: descripcion.trim()
-        })
-      }
-    }
-    
-    const clientes = Array.from(clientesSet).sort()
-    
-    console.log(`✅ Cargados ${clientes.length} clientes y ${empresasData.length} empresas desde Google Sheet`)
+    console.log(`✅ Total: ${clientesUnicos.length} clientes únicos y ${empresasUnicas.length} empresas únicas`)
     
     res.json({
       success: true,
-      empresas: empresasData,
-      clientes: clientes
+      empresas: empresasUnicas,
+      clientes: clientesUnicos
     })
     
   } catch (error) {
     console.error('❌ Error cargando clientes y empresas:', error)
     res.status(500).json({
       success: false,
-      error: 'Error cargando datos desde Google Sheet',
+      error: 'Error cargando datos desde Google Sheets',
       details: error.message
     })
   }

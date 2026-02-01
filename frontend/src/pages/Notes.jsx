@@ -103,7 +103,7 @@ export default function Notes() {
     if (!showResolveModal.noteId) return
 
     try {
-      const response = await fetch(getApiUrl(`/api/notes/${showResolveModal.noteId}/resolve`), {
+      const response = await fetch(`/api/notes/${showResolveModal.noteId}/resolve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,7 +129,7 @@ export default function Notes() {
 
   const handleUnresolveNote = async (noteId) => {
     try {
-      const response = await fetch(getApiUrl(`/api/notes/${noteId}/unresolve`), {
+      const response = await fetch(`/api/notes/${noteId}/unresolve`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -155,7 +155,7 @@ export default function Notes() {
     }
 
     try {
-      const response = await fetch(getApiUrl(`/api/notes/${noteId}`), {
+      const response = await fetch(`/api/notes/${noteId}`, {
         method: 'DELETE'
       })
 
@@ -195,7 +195,7 @@ export default function Notes() {
     
     setIsEditing(true)
     try {
-      const response = await fetch(getApiUrl(`/api/notes/${noteId}`), {
+      const response = await fetch(`/api/notes/${noteId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
