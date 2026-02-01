@@ -4963,7 +4963,7 @@ app.get('/api/clientes-empresas', async (req, res) => {
     try {
       const clientesResult = await sheets.spreadsheets.values.get({
         spreadsheetId: EMPRESAS_SHEET_ID,
-        range: `${quotedClientes}!A:H`  // Todas las columnas de Clientes
+        range: `${quotedClientes}!A:C`  // Columnas A (Empresa), B (Mayus), C (Descripción)
       })
       
       const clientesRows = clientesResult.data.values || []
@@ -4972,21 +4972,11 @@ app.get('/api/clientes-empresas', async (req, res) => {
         // Saltar la fila de encabezados
         for (let i = 1; i < clientesRows.length; i++) {
           const row = clientesRows[i]
-          const empresa = row[2] ? row[2].trim() : ''  // Columna C: Empresa
-          const mapa = row[3] ? row[3].trim() : ''     // Columna D: Mapa
-          const descripcion = row[4] ? row[4].trim() : '' // Columna E: Descripción
+          const empresa = row[0] ? row[0].trim() : ''  // Columna A: Empresa
+          const descripcion = row[2] ? row[2].trim() : '' // Columna C: Descripción
           
           if (empresa) {
-            // Agregar a empresasData si tiene mapa
-            if (mapa) {
-              empresasData.push({
-                empresa: empresa,
-                mapa: mapa,
-                descripcion: descripcion
-              })
-            }
-            
-            // Agregar a lista de clientes
+            // Agregar solo a lista de clientes (no a empresasData ya que no tiene mapa)
             clientesData.push(empresa)
           }
         }
