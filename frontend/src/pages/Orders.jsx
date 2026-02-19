@@ -696,8 +696,9 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   // Pre-cargar formulario cuando se activa modo edición
   useEffect(() => {
     if (editingOrder) {
-      // Obtener la fecha desde múltiples posibles fuentes y limpiar comillas
-      let fechaOriginal = editingOrder.fecha || editingOrder['Fechas'] || ''
+      // Obtener la fecha programada (Fechas) primero.
+      // "Fecha Registro" se usa solo para auditoría y no debe poblar "Fecha del Pedido".
+      let fechaOriginal = editingOrder.fechas || editingOrder['Fechas'] || editingOrder.fecha || ''
       
       // Limpiar comilla simple al inicio (Google Sheets a veces las agrega)
       if (typeof fechaOriginal === 'string' && fechaOriginal.startsWith("'")) {
@@ -707,6 +708,18 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       // Convertir fecha del formato DD/MM/YYYY a yyyy-MM-dd para el input date usando dateService
       const fechaConvertida = convertToISO(fechaOriginal) || fechaOriginal
       
+      // Debug de fechas en modo edición para rastrear fuentes de datos en producción.
+      console.log('🐛 [EDIT FECHAS] Fuentes al abrir edición:', {
+        id: editingOrder.id,
+        fechaProgramada_fechas: editingOrder.fechas,
+        fechaProgramada_Fechas: editingOrder['Fechas'],
+        fechaLegacy_fecha: editingOrder.fecha,
+        fechaRegistro_alias: editingOrder.fecha_registro,
+        fechaRegistro_columna: editingOrder['Fecha Registro'],
+        fechaOriginalElegida: fechaOriginal,
+        fechaConvertida
+      })
+
       // Asegurar que tiempo_espera se incluya con todas sus variantes posibles
       const tiempoEspera = editingOrder.tiempo_espera || editingOrder['Tiempo de espera'] || editingOrder['Tiempo de Espera'] || ''
       

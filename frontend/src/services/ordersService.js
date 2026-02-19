@@ -23,8 +23,12 @@ const normalize = (s) => String(s || '')
  * Mapa de headers de Google Sheets a propiedades del objeto
  */
 const headerMap = {
-  fecharegistro: 'fecha', // Usar "Fecha Registro" como fecha principal del pedido
-  fechas: 'fechas', // "Fechas" es un campo separado (fecha de entrega)
+  // IMPORTANTE:
+  // - "Fecha Registro" = fecha de creación (auditoría)
+  // - "Fechas" = fecha programada del pedido (ficha)
+  // Nunca mapear Fecha Registro -> fecha, porque pisa la fecha programada en edición.
+  fecharegistro: 'fecha_registro',
+  fechas: 'fechas',
   horaregistro: 'hora_registro',
   operador: 'operador',
   cliente: 'cliente',
@@ -115,7 +119,7 @@ export const mapRowToOrder = (rowObj, index = 0, initialOrder = {}, operadorDefa
         let value = String(v ?? '').trim()
         
         // Convertir fechas de Excel a formato estándar
-        if (key === 'fecha' || key === 'fechas') {
+        if (key === 'fecha' || key === 'fechas' || key === 'fecha_registro') {
           value = convertExcelDate(value)
         }
         
@@ -123,6 +127,18 @@ export const mapRowToOrder = (rowObj, index = 0, initialOrder = {}, operadorDefa
       }
     }
   }
+
+  // Alias de compatibilidad:
+  // "fecha" debe representar la fecha programada (Fechas) para formularios legacy.
+  if (mapped.fechas) {
+    mapped.fecha = mapped.fechas
+  }
+
+  // Mantener fecha de registro en alias explícito para inputs de solo lectura.
+  if (mapped.fecha_registro) {
+    mapped['Fecha Registro'] = mapped.fecha_registro
+  }
+
   if (!mapped.operador) mapped.operador = operadorDefault
   
   return mapped
