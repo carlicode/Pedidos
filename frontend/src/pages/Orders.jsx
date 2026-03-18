@@ -244,13 +244,24 @@ export default function Orders() {
     
     try {
       await addBikerAPI(nuevoBiker)
-        showNotification('✅ Biker agregado exitosamente', 'success')
-        setNuevoBiker({
-          biker: '',
-          whatsapp: ''
+      showNotification('✅ Biker agregado exitosamente', 'success')
+      setNuevoBiker({ biker: '', whatsapp: '' })
+      loadBikersAgregar()
+
+      // Reproducir sonido y mostrar countdown de 15s antes de recargar
+      playBikerSound()
+      if (bikerCountdownRef.current) clearInterval(bikerCountdownRef.current)
+      setBikerSuccessCountdown(15)
+      bikerCountdownRef.current = setInterval(() => {
+        setBikerSuccessCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(bikerCountdownRef.current)
+            window.location.reload()
+            return null
+          }
+          return prev - 1
         })
-        // Recargar bikers
-        loadBikersAgregar()
+      }, 1000)
     } catch (error) {
       showNotification(`❌ ${error.message}`, 'error')
     }
@@ -289,10 +300,21 @@ export default function Orders() {
   const [bikersAgregar, setBikersAgregar] = useState([]) // Para "Agregar Pedido"
   const [loadingBikersAgregar, setLoadingBikersAgregar] = useState(false)
   const [notification, setNotification] = useState(null)
+  const [bikerSuccessCountdown, setBikerSuccessCountdown] = useState(null)
+  const bikerCountdownRef = useRef(null)
   
   // Función de notificación (debe estar definida antes de usarse)
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type })
+  }
+
+  // Reproduce el sonido de notificación existente
+  const playBikerSound = () => {
+    try {
+      const audio = new Audio(notificationSound)
+      audio.volume = 0.8
+      audio.play().catch(() => {})
+    } catch (e) {}
   }
   
   // Custom hooks for form logic (REFACTORED)
@@ -7295,6 +7317,35 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         <div className={`notification ${notification.type}`}>
           {notification.message}
           <button className="notification-close" onClick={() => setNotification(null)}>×</button>
+        </div>
+      )}
+      {bikerSuccessCountdown !== null && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+          background: 'linear-gradient(135deg, #16a34a, #15803d)',
+          color: 'white', padding: '18px 24px', textAlign: 'center',
+          fontSize: '20px', fontWeight: 'bold',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px'
+        }}>
+          <span style={{ fontSize: '28px' }}>🚴‍♂️</span>
+          <div>
+            <div>¡Biker agregado exitosamente!</div>
+            <div style={{ fontSize: '14px', fontWeight: 'normal', marginTop: '4px', opacity: 0.9 }}>
+              Actualizando la página en <strong>{bikerSuccessCountdown}</strong> segundo{bikerSuccessCountdown !== 1 ? 's' : ''}...
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              clearInterval(bikerCountdownRef.current)
+              setBikerSuccessCountdown(null)
+            }}
+            style={{
+              marginLeft: '16px', background: 'rgba(255,255,255,0.2)', border: 'none',
+              color: 'white', borderRadius: '50%', width: '28px', height: '28px',
+              cursor: 'pointer', fontSize: '16px', lineHeight: '28px'
+            }}
+          >×</button>
         </div>
       )}
       <nav className="tabs enhanced-tabs">
