@@ -44,7 +44,7 @@ export default function PedidosClientes() {
     try {
       if (!silencioso) setLoading(true)
 
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5055'
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'https://d1tufgzki2ukr8.cloudfront.net'
       const response = await fetch(`${backendUrl}/api/read-client-orders`, {
         cache: 'no-store'
       })
@@ -206,7 +206,7 @@ export default function PedidosClientes() {
     if (!confirmar) return
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5055'
+      const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'https://d1tufgzki2ukr8.cloudfront.net'
       const response = await fetch(`${backendUrl}/api/cliente/cancelar-pedido`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
