@@ -953,7 +953,7 @@ export default function PedidosClientes() {
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>
-                      Hotel Cochabamba
+                      Recojo
                     </div>
                     <div>
                       {pedido.direccionRecojo ? (
@@ -970,7 +970,7 @@ export default function PedidosClientes() {
                             }}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            Aldeas SOS
+                            Ver mapa →
                           </a>
                         ) : (
                           <span style={{ fontSize: '12px', color: '#0f172a', fontWeight: '500' }}>
@@ -1000,7 +1000,7 @@ export default function PedidosClientes() {
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em'
                     }}>
-                      Aldeas SOS
+                      Entrega
                     </div>
                     <div>
                       {pedido.direccionEntrega ? (
