@@ -43,26 +43,48 @@ export default function App() {
       eventSource.addEventListener('nuevo_pedido', (e) => {
         try {
           const pedido = JSON.parse(e.data)
-          toast.success(`🚨 ¡Nuevo pedido de cliente! #${pedido.id} - ${pedido.cliente}`, {
+          toast(`🚨 ¡Nuevo pedido de cliente! #${pedido.id} - ${pedido.cliente}`, {
             autoClose: 12000,
-            position: 'top-center'
+            position: 'top-center',
+            style: {
+              background: 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '15px',
+              borderRadius: '10px',
+              boxShadow: '0 4px 20px rgba(249,115,22,0.5)'
+            },
+            progressStyle: { background: 'rgba(255,255,255,0.5)' }
           })
-          try {
-            const audio = new Audio('/music/new-notification.mp3')
-            audio.play().catch(() => {
-              const AudioCtx = window.AudioContext || window.webkitAudioContext
-              if (AudioCtx) {
-                const ctx = new AudioCtx()
-                const oscillator = ctx.createOscillator()
-                oscillator.connect(ctx.destination)
-                oscillator.frequency.value = 880
-                oscillator.start()
-                oscillator.stop(ctx.currentTime + 0.4)
-              }
-            })
-          } catch (audioErr) {
-            console.log('No se pudo reproducir audio:', audioErr)
+          const playSound = () => {
+            try {
+              const audio = new Audio('/music/new-notification.mp3')
+              audio.play().catch(() => {
+                try {
+                  const AudioCtx = window.AudioContext || window.webkitAudioContext
+                  if (AudioCtx) {
+                    const ctx = new AudioCtx()
+                    const osc = ctx.createOscillator()
+                    const gain = ctx.createGain()
+                    osc.connect(gain)
+                    gain.connect(ctx.destination)
+                    osc.frequency.value = 880
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5)
+                    osc.start(ctx.currentTime)
+                    osc.stop(ctx.currentTime + 0.5)
+                  }
+                } catch (_) {}
+              })
+            } catch (_) {}
           }
+          let count = 0
+          const interval = setInterval(() => {
+            playSound()
+            count++
+            if (count >= 5) clearInterval(interval)
+          }, 1500)
+          playSound()
         } catch (err) {
           console.error('Error procesando evento SSE:', err)
         }
