@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
+import { ToastContainer, toast } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Landing from './pages/Landing.jsx'
@@ -28,6 +28,60 @@ export default function App() {
 
   // No mostrar header en landing page ni en login
   const showHeader = location.pathname !== '/' && location.pathname !== '/login'
+
+  // SSE global: notificar nuevos pedidos de clientes en cualquier página
+  const sseReconnectRef = useRef(null)
+  useEffect(() => {
+    if (!user || (user.role !== 'admin' && user.role !== 'operador')) return
+
+    const backendUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || 'https://d1tufgzki2ukr8.cloudfront.net'
+    let eventSource = null
+
+    const connect = () => {
+      eventSource = new EventSource(`${backendUrl}/api/sse/pedidos-clientes`)
+
+      eventSource.addEventListener('nuevo_pedido', (e) => {
+        try {
+          const pedido = JSON.parse(e.data)
+          toast.success(`🚨 ¡Nuevo pedido de cliente! #${pedido.id} - ${pedido.cliente}`, {
+            autoClose: 12000,
+            position: 'top-center'
+          })
+          try {
+            const audio = new Audio('/music/new-notification.mp3')
+            audio.play().catch(() => {
+              const AudioCtx = window.AudioContext || window.webkitAudioContext
+              if (AudioCtx) {
+                const ctx = new AudioCtx()
+                const oscillator = ctx.createOscillator()
+                oscillator.connect(ctx.destination)
+                oscillator.frequency.value = 880
+                oscillator.start()
+                oscillator.stop(ctx.currentTime + 0.4)
+              }
+            })
+          } catch (audioErr) {
+            console.log('No se pudo reproducir audio:', audioErr)
+          }
+        } catch (err) {
+          console.error('Error procesando evento SSE:', err)
+        }
+      })
+
+      eventSource.onerror = () => {
+        console.warn('SSE error, reconectando en 5s...')
+        eventSource.close()
+        sseReconnectRef.current = setTimeout(connect, 5000)
+      }
+    }
+
+    connect()
+
+    return () => {
+      if (eventSource) eventSource.close()
+      if (sseReconnectRef.current) clearTimeout(sseReconnectRef.current)
+    }
+  }, [user])
 
   return (
     <div className="app-container">
