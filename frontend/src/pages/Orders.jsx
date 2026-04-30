@@ -2685,7 +2685,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       const distanciaValue = parseFloat(value) || 0
       const tieneMedioTransporte = newForm.medio_transporte && newForm.medio_transporte.trim() !== ''
       
-      if (distanciaValue > 0 && tieneMedioTransporte && !recojoClienteAvisa && !entregaClienteAvisa) {
+      if (distanciaValue > 0 && tieneMedioTransporte) {
         if (newForm.metodo_pago === 'Cuenta' || newForm.metodo_pago === 'A cuenta') {
           const precio = calculatePrice(distanciaValue.toString(), newForm.medio_transporte)
           setForm((prev) => ({ 
@@ -2748,7 +2748,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       const tieneMedioTransporte = value && value.trim() !== ''
       const distanciaValue = parseFloat(form.distancia_km) || 0
       
-      if (tieneMedioTransporte && distanciaValue > 0 && !recojoClienteAvisa && !entregaClienteAvisa) {
+      if (tieneMedioTransporte && distanciaValue > 0) {
         const precio = calculatePrice(distanciaValue, value)
         
         if (form.metodo_pago === 'Cuenta' || form.metodo_pago === 'A cuenta') {

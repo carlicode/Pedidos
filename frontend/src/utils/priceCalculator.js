@@ -4,6 +4,22 @@
  */
 
 /**
+ * Unifica el valor del medio (SearchableSelect, espacios invisibles, {value}).
+ * Exportado por si Orders u otros módulos necesitan comparar.
+ */
+export function normalizeMedioTransporte(medio) {
+  if (medio == null) return ''
+  if (typeof medio === 'object' && medio !== null) {
+    const v = medio.value ?? medio.label ?? medio.id
+    if (v != null && v !== '') {
+      return String(v).replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim()
+    }
+    return ''
+  }
+  return String(medio).replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '').trim()
+}
+
+/**
  * Calcula el precio base para Bicicleta según la distancia
  * @param {number} dist - Distancia en kilómetros
  * @returns {number} Precio base en Bs
@@ -11,9 +27,9 @@
 const calculateBicicletaPrice = (dist) => {
   // Redondear hacia arriba (si es 3.74 km, cobrar 4 km)
   const distRedondeada = Math.ceil(dist)
-  
+
   if (distRedondeada <= 1) return 8
-  
+
   // Después del primer km: precio base 8 Bs + 2.5 Bs por cada km adicional
   const kmAdicionales = distRedondeada - 1
   return 8 + (kmAdicionales * 2.5)
@@ -25,12 +41,10 @@ const calculateBicicletaPrice = (dist) => {
  * @returns {number} Precio base en Bs
  */
 const calculateBeezeroPrice = (dist) => {
-  // Redondear hacia arriba (si es 3.74 km, cobrar 4 km)
   const distRedondeada = Math.ceil(dist)
-  
+
   if (distRedondeada <= 1) return 10
-  
-  // Después del primer km: precio base 10 Bs + 3 Bs por cada km adicional
+
   const kmAdicionales = distRedondeada - 1
   return 10 + (kmAdicionales * 3)
 }
@@ -38,39 +52,29 @@ const calculateBeezeroPrice = (dist) => {
 /**
  * Calcula el precio basado en distancia y medio de transporte
  * @param {number|string} distance - Distancia en kilómetros
- * @param {string} medioTransporte - Medio de transporte (Bicicleta, Cargo, Scooter, Beezero)
+ * @param {string|object} medioTransporte - Medio de transporte (Bicicleta, Cargo, Scooter, Beezero)
  * @returns {number} Precio calculado en Bs
  */
 export const calculatePrice = (distance, medioTransporte) => {
   if (!distance || distance === '' || isNaN(parseFloat(distance))) {
     return 0
   }
-  
+
   const dist = parseFloat(distance)
+  const medio = normalizeMedioTransporte(medioTransporte)
   let basePrice = 0
-  
-  // Esquema de precios para Bicicleta (COSTOS TRANSPARENTES)
-  if (medioTransporte === 'Bicicleta') {
+
+  if (medio === 'Bicicleta') {
     basePrice = calculateBicicletaPrice(dist)
-  } 
-  // Esquema de precios para BeeZero (inicia en 10 Bs)
-  else if (medioTransporte === 'Beezero') {
+  } else if (medio === 'Beezero') {
     basePrice = calculateBeezeroPrice(dist)
-  }
-  // Esquema de precios para Cargo: Bicicleta + 6 Bs
-  else if (medioTransporte === 'Cargo') {
-    const precioBicicleta = calculateBicicletaPrice(dist)
-    basePrice = precioBicicleta + 6
-  }
-  // Scooter: misma tarifa que Bicicleta
-  else if (medioTransporte === 'Scooter') {
+  } else if (medio === 'Cargo') {
+    basePrice = calculateBicicletaPrice(dist) + 6
+  } else if (medio === 'Scooter') {
     basePrice = calculateBicicletaPrice(dist)
-  }
-  // Si no coincide con ningún medio conocido, retornar 0
-  else {
+  } else {
     return 0
   }
-  
+
   return basePrice
 }
-

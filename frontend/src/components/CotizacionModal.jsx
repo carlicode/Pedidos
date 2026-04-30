@@ -420,9 +420,7 @@ const CotizacionModal = ({ isOpen, onClose, onCrearCarrera, initialData = null }
     }
 
     const basePrice = calculatePrice(dist, medioTransporte)
-    
-    if (basePrice === 0) {
-      // Para Scooter u otros medios sin cálculo automático
+    if (!Number.isFinite(basePrice) || basePrice <= 0) {
       setPrecio(null)
       return
     }
