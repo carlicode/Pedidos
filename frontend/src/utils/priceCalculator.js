@@ -39,7 +39,7 @@ const calculateBeezeroPrice = (dist) => {
  * Calcula el precio basado en distancia y medio de transporte
  * @param {number|string} distance - Distancia en kilómetros
  * @param {string} medioTransporte - Medio de transporte (Bicicleta, Cargo, Scooter, Beezero)
- * @returns {number} Precio calculado en Bs (0 si no hay cálculo automático para Scooter)
+ * @returns {number} Precio calculado en Bs
  */
 export const calculatePrice = (distance, medioTransporte) => {
   if (!distance || distance === '' || isNaN(parseFloat(distance))) {
@@ -62,9 +62,9 @@ export const calculatePrice = (distance, medioTransporte) => {
     const precioBicicleta = calculateBicicletaPrice(dist)
     basePrice = precioBicicleta + 6
   }
-  // Para Scooter no se calcula precio automáticamente
+  // Scooter: misma tarifa que Bicicleta
   else if (medioTransporte === 'Scooter') {
-    return 0 // Retorna 0 para indicar que no hay cálculo automático
+    basePrice = calculateBicicletaPrice(dist)
   }
   // Si no coincide con ningún medio conocido, retornar 0
   else {
