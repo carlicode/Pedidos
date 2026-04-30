@@ -1400,12 +1400,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           return bikerEnPedido === biker.nombre
         })
         
-        // Filtrar pedidos por la fecha específica seleccionada (considerando zona horaria Bolivia)
+        // Filtrar por día de la carrera (Fechas); Fecha Registro es solo cuándo se cargó la ficha
           pedidosBiker = pedidosBiker.filter(pedido => {
-            const fechaPedido = pedido['Fecha Registro'] || 
-                              pedido['Fechas'] || 
+            const fechaPedido = pedido['Fechas'] ||
+                              pedido.fechas ||
                               pedido.fecha ||
-                              pedido['Fecha pedido']
+                              pedido['Fecha pedido'] ||
+                              pedido['Fecha Registro'] ||
+                              pedido.fecha_registro
             
           if (!fechaPedido) return false
             
@@ -1478,7 +1480,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           return {
             // Columnas principales del pedido
             id: pedido.ID || pedido.id || 'N/A',
-            fechaRegistro: pedido['Fecha Registro'] || pedido.fecha_registro || pedido.fecha || 'N/A',
+            fechaRegistro: pedido['Fecha Registro'] || pedido.fecha_registro || 'N/A',
             horaRegistro: pedido['Hora Registro'] || pedido.hora_registro || pedido.hora || 'N/A',
             operador: pedido.Operador || pedido.operador || 'N/A',
           cliente: pedido.Cliente || pedido.cliente || 'N/A',
@@ -1505,8 +1507,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             cobroPago: pedido['Cobro o pago'] || pedido.cobro_pago || 'N/A',
             montoCobroPago: parseFloat(pedido['Monto cobro o pago'] || pedido.monto_cobro_pago || 0),
             
-            // Campos calculados adicionales
-            fecha: pedido['Fecha Registro'] || pedido.fecha_registro || pedido.fecha || 'N/A', // Para compatibilidad
+            // Campos calculados adicionales (fecha = día de carrera para agrupar cuentas)
+            fecha: pedido['Fechas'] || pedido.fechas || pedido.fecha || pedido['Fecha pedido'] || pedido['Fecha Registro'] || pedido.fecha_registro || 'N/A',
             hora: pedido['Hora Registro'] || pedido.hora_registro || pedido.hora || 'N/A', // Para compatibilidad
             precio: precioCarrera // Para compatibilidad
           }
@@ -1596,7 +1598,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
     
     return pedidos.filter(pedido => {
-      const fechaPedido = pedido.fecha || pedido['Fecha Registro'] || pedido['Fechas'] || ''
+      const fechaPedido = pedido['Fechas'] || pedido.fechas || pedido.fecha || pedido['Fecha pedido'] || pedido['Fecha Registro'] || pedido.fecha_registro || ''
       if (!fechaPedido || fechaPedido === 'N/A') return false
       
       // Convertir fecha del pedido a Date usando dateService
@@ -6295,7 +6297,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                       
                       if (fechaInicioEmpresas || fechaFinEmpresas) {
                         pedidosFiltrados = cliente.pedidos.filter(pedido => {
-                          const fechaPedido = pedido.fecha || pedido['Fecha Registro'] || pedido['Fechas'] || ''
+                          const fechaPedido = pedido['Fechas'] || pedido.fechas || pedido.fecha || pedido['Fecha pedido'] || pedido['Fecha Registro'] || pedido.fecha_registro || ''
                           if (!fechaPedido || fechaPedido === 'N/A') return false
                           
                           let fechaPedidoDate = null
@@ -6514,7 +6516,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                                       }
                                       
                                       const precioCarrera = parseFloat(pedido.precio_bs || pedido['Precio [Bs]'] || 0)
-                                      const fechaOriginal = pedido.fecha || pedido['Fecha Registro'] || pedido['Fechas'] || 'N/A'
+                                      const fechaOriginal = pedido['Fechas'] || pedido.fechas || pedido.fecha || pedido['Fecha Registro'] || pedido.fecha_registro || 'N/A'
                                       // Formatear fecha a DD/MM/YYYY
                                       const fecha = formatDateForDisplay(fechaOriginal)
                                       const tiempoEspera = pedido.tiempo_espera || pedido['Tiempo de espera'] || pedido['Tiempo de Espera'] || ''

@@ -207,10 +207,12 @@ export const calcularCuentasBiker = (orders, bikersList, opciones = {}) => {
     
     // Filtrar pedidos por fecha
     pedidosBiker = pedidosBiker.filter(pedido => {
-      const fechaPedido = pedido['Fecha Registro'] || 
-                        pedido['Fechas'] || 
+      const fechaPedido = pedido['Fechas'] ||
+                        pedido.fechas ||
                         pedido.fecha ||
-                        pedido['Fecha pedido']
+                        pedido['Fecha pedido'] ||
+                        pedido['Fecha Registro'] ||
+                        pedido.fecha_registro
       
       if (!fechaPedido) return false
       
