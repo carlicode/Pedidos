@@ -5195,6 +5195,132 @@ app.get('/api/clientes-empresas', async (req, res) => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// SSE — Notificaciones en tiempo real de nuevos pedidos de clientes
+// ---------------------------------------------------------------------------
+
+const sseClientes = new Set()
+const pedidosVistos = new Set()
+let pollingInicializado = false
+let pollingIntervalId = null
+
+function enVentanaPollingBolivia() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/La_Paz',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(new Date())
+    const hour = Number(parts.find(p => p.type === 'hour')?.value ?? NaN)
+    const minute = Number(parts.find(p => p.type === 'minute')?.value ?? NaN)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return true
+    const total = hour * 60 + minute
+    return total >= 8 * 60 && total <= 22 * 60
+  } catch (_) {
+    return true
+  }
+}
+
+function emitirEventoClientes(evento, datos) {
+  const mensaje = `event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`
+  for (const res of sseClientes) {
+    try { res.write(mensaje) } catch (_) { sseClientes.delete(res) }
+  }
+}
+
+async function pollClientesPedidos() {
+  try {
+    const auth = await getAuthClient()
+    await auth.authorize()
+    const sheets = google.sheets({ version: 'v4', auth })
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `'Clientes'!A:AD`
+    })
+
+    const rows = response.data.values || []
+    if (rows.length < 2) return
+
+    const headers = rows[0]
+    const idIdx = headers.findIndex(h => String(h).trim().toUpperCase() === 'ID')
+    const clienteIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'cliente')
+    const estadoIdx = headers.findIndex(h => String(h).trim().toLowerCase() === 'estado pedido')
+
+    if (idIdx === -1) return
+
+    for (const fila of rows.slice(1)) {
+      const rawId = fila[idIdx]
+      if (rawId === undefined || rawId === null || String(rawId).trim() === '') continue
+
+      const idStr = String(rawId).trim()
+      if (idStr.startsWith('=')) continue
+
+      if (!pedidosVistos.has(idStr)) {
+        pedidosVistos.add(idStr)
+        if (!pollingInicializado) continue
+
+        const cliente = clienteIdx !== -1 ? String(fila[clienteIdx] || '').trim() : '—'
+        const estado = estadoIdx !== -1 ? String(fila[estadoIdx] || 'Pendiente').trim() : 'Pendiente'
+
+        console.log(`🔔 Nuevo pedido de cliente detectado: ID=${idStr} Cliente=${cliente}`)
+        emitirEventoClientes('nuevo_pedido', {
+          id: idStr,
+          cliente,
+          estado,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+
+    if (!pollingInicializado) {
+      pollingInicializado = true
+      console.log(`✅ Polling clientes inicializado. Baseline: ${pedidosVistos.size} pedidos conocidos.`)
+    }
+  } catch (err) {
+    console.error('⚠️  Error en pollClientesPedidos:', err.message)
+  }
+}
+
+app.get('/api/sse/pedidos-clientes', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.flushHeaders()
+
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n') } catch (_) { clearInterval(heartbeat) }
+  }, 25000)
+
+  sseClientes.add(res)
+  console.log(`📡 Cliente SSE conectado. Total: ${sseClientes.size}`)
+
+  if (enVentanaPollingBolivia()) {
+    pollClientesPedidos()
+  }
+
+  req.on('close', () => {
+    clearInterval(heartbeat)
+    sseClientes.delete(res)
+    console.log(`📡 Cliente SSE desconectado. Total: ${sseClientes.size}`)
+  })
+})
+
+function tickPollingClientes() {
+  if (!enVentanaPollingBolivia()) return
+  if (sseClientes.size === 0 && pollingInicializado) return
+  pollClientesPedidos()
+}
+
+function iniciarPollingClientes() {
+  tickPollingClientes()
+  if (!pollingIntervalId) {
+    pollingIntervalId = setInterval(tickPollingClientes, 60_000)
+  }
+}
+
 // Inicializar secretos y luego iniciar el servidor
 ;(async () => {
   await initializeSecrets()
@@ -5205,8 +5331,8 @@ app.get('/api/clientes-empresas', async (req, res) => {
     console.log(`   - Network: http://0.0.0.0:${PORT}`)
     console.log(`💡 Para acceder desde otros dispositivos en la red, usa tu IP local`)
     
-    // Log del inicio del servidor
     logSystem.startup(PORT)
+    iniciarPollingClientes()
   })
 })()
 

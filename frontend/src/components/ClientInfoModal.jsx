@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import '../styles/ClientInfoModal.css';
 import { getApiUrl } from '../utils/api.js';
 
-export default function ClientInfoModal({ isOpen, onClose, clientName }) {
+export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteToDetalles }) {
   const [clientInfo, setClientInfo] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,17 +21,18 @@ export default function ClientInfoModal({ isOpen, onClose, clientName }) {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch(getApiUrl(`/api/client-info/${encodeURIComponent(clientName)}`));
-      
+
       if (!response.ok) {
-        throw new Error('Error al obtener información del cliente');
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Error al obtener información del cliente');
       }
-      
+
       const data = await response.json();
       setClientInfo(data.data || []);
-      
+
       if (data.data.length === 0) {
         setError('No se encontró información para este cliente');
       }
@@ -43,6 +44,23 @@ export default function ClientInfoModal({ isOpen, onClose, clientName }) {
     }
   };
 
+  const buildDetallesText = (info) => {
+    const parts = []
+    const descripcion = (info.descripcion || info.cuenta || '').trim()
+    const mapa = (info.mapa || '').trim()
+    if (descripcion) parts.push(descripcion)
+    if (mapa) parts.push(mapa)
+    return parts.join('\n')
+  }
+
+  const handlePasteToDetalles = (info) => {
+    const text = buildDetallesText(info)
+    if (!text || !onPasteToDetalles) return
+    onPasteToDetalles(text)
+  }
+
+  const primaryInfo = clientInfo.find((info) => buildDetallesText(info))
+
   if (!isOpen) return null;
 
   return (
@@ -52,7 +70,7 @@ export default function ClientInfoModal({ isOpen, onClose, clientName }) {
           <h2>ℹ️ Información del Cliente</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        
+
         <div className="modal-body">
           <div className="client-info-search">
             <strong>Cliente:</strong> {clientName}
@@ -76,46 +94,49 @@ export default function ClientInfoModal({ isOpen, onClose, clientName }) {
               <p className="results-count">
                 Se encontraron <strong>{clientInfo.length}</strong> registro(s)
               </p>
-              
+
               {clientInfo.map((info, index) => (
                 <div key={index} className="client-info-card">
                   <div className="card-header">
                     <h3>{info.nombreCliente}</h3>
+                    {info.fuente && (
+                      <span className="value tag">{info.fuente}</span>
+                    )}
                   </div>
-                  
+
                   <div className="card-body">
                     <div className="info-row">
-                      <span className="label">Cuenta:</span>
-                      <span className="value">{info.cuenta || '-'}</span>
+                      <span className="label">Descripción:</span>
+                      <span className="value">{info.descripcion || '-'}</span>
                     </div>
-                    
-                    <div className="info-row">
-                      <span className="label">Procedimientos:</span>
-                      <span className="value">{info.procedimientos || '-'}</span>
-                    </div>
-                    
-                    <div className="info-row">
-                      <span className="label">Etiqueta:</span>
-                      <span className="value tag">{info.etiqueta || '-'}</span>
-                    </div>
-                    
-                    <div className="info-row">
-                      <span className="label">Envíos:</span>
-                      <span className="value">{info.envios || '-'}</span>
-                    </div>
-                    
-                    <div className="info-row">
-                      <span className="label">Tipo de Pago:</span>
-                      <span className="value payment-type">{info.tipoPago || '-'}</span>
-                    </div>
+
+                    {info.mapa && (
+                      <div className="info-row">
+                        <span className="label">Mapa:</span>
+                        <span className="value">
+                          <a href={info.mapa} target="_blank" rel="noopener noreferrer">
+                            Ver en Google Maps
+                          </a>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-        
+
         <div className="modal-footer">
+          {onPasteToDetalles && primaryInfo && (
+            <button
+              type="button"
+              className="btn-paste-detalles"
+              onClick={() => handlePasteToDetalles(primaryInfo)}
+            >
+              📋 Pegar en Detalles de la Carrera
+            </button>
+          )}
           <button className="btn-secondary" onClick={onClose}>
             Cerrar
           </button>

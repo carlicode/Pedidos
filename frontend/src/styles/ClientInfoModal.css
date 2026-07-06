@@ -24,6 +24,27 @@
 .client-info-modal .modal-footer {
   background: var(--bg-tertiary);
   border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.client-info-modal .modal-footer .btn-paste-detalles {
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-600) 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.client-info-modal .modal-footer .btn-paste-detalles:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
 }
 
 .client-info-modal .modal-footer .btn-secondary {

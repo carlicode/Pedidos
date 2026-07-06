@@ -388,6 +388,7 @@ export default function Orders() {
   const [showClientInfoModal, setShowClientInfoModal] = useState(false)
   const [hasClientInfo, setHasClientInfo] = useState(false)
   const [checkingClientInfo, setCheckingClientInfo] = useState(false)
+  const [clientInfoError, setClientInfoError] = useState(null)
   
   // Hook de Kanban para gestionar drag & drop y cambios de estado
   const kanbanHook = useKanban(
@@ -1198,20 +1199,35 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     if (!name || name === '__CUSTOM__') {
       setHasClientInfo(false)
       setCheckingClientInfo(false)
+      setClientInfoError(null)
       return
     }
     const ac = new AbortController()
     setCheckingClientInfo(true)
     setHasClientInfo(false)
+    setClientInfoError(null)
     fetch(getApiUrl(`/api/client-info/${encodeURIComponent(name)}`), { signal: ac.signal })
-      .then((res) => {
-        if (!res.ok) return { data: [] }
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          const msg = body.error || `Error ${res.status} al consultar información del cliente`
+          setClientInfoError(msg)
+          if (msg.includes('CLIENT_INFO_SHEET_ID')) {
+            toast.error('Falta configurar CLIENT_INFO_SHEET_ID en el servidor', {
+              position: 'top-right',
+              autoClose: 8000,
+            })
+          }
+          return { data: [] }
+        }
         return res.json()
       })
       .then((data) => {
         const list = data.data || []
-        if (list.length > 0) {
+        const conDescripcion = list.filter((item) => item.descripcion?.trim())
+        if (conDescripcion.length > 0) {
           setHasClientInfo(true)
+          setClientInfoError(null)
           if (notificationAudioRef.current) {
             notificationAudioRef.current.currentTime = 0
             notificationAudioRef.current.play().catch(() => {})
@@ -1229,7 +1245,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         }
       })
       .catch((err) => {
-        if (err.name !== 'AbortError') setHasClientInfo(false)
+        if (err.name !== 'AbortError') {
+          setHasClientInfo(false)
+          setClientInfoError('No se pudo consultar la información del cliente')
+        }
       })
       .finally(() => setCheckingClientInfo(false))
     return () => ac.abort()
@@ -3864,6 +3883,8 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                             ? 'Seleccione un cliente primero'
                             : checkingClientInfo
                               ? 'Comprobando información...'
+                              : clientInfoError
+                                ? clientInfoError
                               : hasClientInfo
                                 ? 'Ver información del cliente'
                                 : 'No hay información de este cliente en el sheet'
@@ -3894,17 +3915,23 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                   </div>
                   <div className="form-group" style={{flex: 1, marginTop: '0px'}}>
                     <label style={{marginBottom: '4px', display: 'block'}}>Detalles de la Carrera</label>
-                    <input 
-                      name="detalles_carrera" 
-                      value={form.detalles_carrera} 
-                      onChange={handleChange} 
+                    <textarea
+                      name="detalles_carrera"
+                      value={form.detalles_carrera}
+                      onChange={handleChange}
                       placeholder="Descripción adicional del pedido"
+                      rows={2}
                       style={{
                         width: '100%',
                         padding: '8px 12px',
                         border: '1px solid #ddd',
                         borderRadius: '4px',
-                        fontSize: '14px'
+                        fontSize: '14px',
+                        lineHeight: '1.45',
+                        minHeight: '52px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box'
                       }}
                     />
                 </div>
@@ -8574,6 +8601,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         isOpen={showClientInfoModal}
         onClose={() => setShowClientInfoModal(false)}
         clientName={form.cliente}
+        onPasteToDetalles={(text) => {
+          setForm((prev) => ({ ...prev, detalles_carrera: text }))
+          setShowClientInfoModal(false)
+          toast.success('Info pegada en Detalles de la Carrera', {
+            position: 'top-right',
+            autoClose: 3000,
+          })
+        }}
       />
 
       {/* Alerta del Timer cuando llega el tiempo */}
