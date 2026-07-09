@@ -139,7 +139,7 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
             display: 'flex',
             flexWrap: 'wrap',
             gap: '24px',
-            alignItems: 'flex-start'
+            alignItems: 'stretch'
           }}
         >
           {/* Columna izquierda: datos del pedido */}
@@ -148,7 +148,8 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
             minWidth: '260px',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '12px 20px'
+            gap: '12px 20px',
+            alignContent: 'start'
           }}>
             {infoRows.map(({ icon, label, value, highlight, pending }) => (
               <div
@@ -198,7 +199,7 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
           </div>
 
           {/* Columna derecha: mensaje de WhatsApp */}
-          <div style={{ flex: '1 1 340px', minWidth: '300px' }}>
+          <div style={{ flex: '1 1 340px', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
             <span style={{
               fontSize: '0.85rem',
               fontWeight: '800',
@@ -208,7 +209,8 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              marginBottom: '8px'
+              marginBottom: '8px',
+              flexShrink: 0
             }}>
               📱 Mensaje para el biker
             </span>
@@ -217,7 +219,8 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
               onChange={(e) => setWhatsappMessage(e.target.value)}
               style={{
                 width: '100%',
-                minHeight: '170px',
+                flex: '1 1 auto',
+                minHeight: '220px',
                 padding: '14px',
                 fontFamily: 'monospace',
                 fontSize: '13px',
@@ -226,17 +229,17 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
                 borderRadius: '10px',
                 background: '#E7FFE7',
                 color: '#075E54',
-                resize: 'vertical',
+                resize: 'none',
                 marginBottom: '10px',
                 whiteSpace: 'pre-wrap'
               }}
             />
             {bikerPending && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--muted)', fontStyle: 'italic', margin: '0 0 10px' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--muted)', fontStyle: 'italic', margin: '0 0 10px', flexShrink: 0 }}>
                 Sin biker asignado — asigna uno para poder enviar el mensaje.
               </p>
             )}
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={async () => {
