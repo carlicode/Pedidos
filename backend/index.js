@@ -1957,7 +1957,7 @@ app.post('/api/orders', async (req, res) => {
       });
     }
 
-    res.json({ ok: true, updated: existingRowIndex > 0 })
+    res.json({ ok: true, updated: existingRowIndex > 0, id: order.id })
   } catch (err) {
     console.error('❌ Error en /api/orders:', err)
     console.error('❌ Stack trace:', err.stack)

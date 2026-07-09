@@ -174,7 +174,7 @@ export default function Orders() {
   const [filter, setFilter] = useState('')
   
   // Hook de WhatsApp para gestionar mensajes
-  const { whatsappMessage, whatsappMessageEdited, setWhatsappMessage, setWhatsappMessageEdited, resetWhatsappMessage } = useWhatsApp(form)
+  const { whatsappMessage, resetWhatsappMessage } = useWhatsApp(form)
   
   // Referencia para el audio de notificación
   const notificationAudioRef = useRef(null)
@@ -290,7 +290,6 @@ export default function Orders() {
   const [lastAddedOrder, setLastAddedOrder] = useState(null)
   
   // Estado para el modal de advertencia de asignar biker
-  const [showAssignBikerModal, setShowAssignBikerModal] = useState(false)
   // Estado para el modal de error de distancia
   const [showDistanceErrorModal, setShowDistanceErrorModal] = useState(false)
   const [lastDistanceError, setLastDistanceError] = useState(null)
@@ -2823,12 +2822,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     }
     
       const result = await saveOrderToSheet(order, silent, SHEET_URL, SHEET_TOKEN)
-      
+
       console.log('✅ [saveToSheet] Guardado exitoso:', result)
-      
+
       if (!silent) {
       showNotification('✅ Pedido guardado en Google Sheet', 'success')
       }
+
+      return result
     } catch (error) {
       console.error('❌ [saveToSheet] Error:', error)
       if (!silent) {
@@ -3154,8 +3155,14 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         }
         
         // Guardar en el sheet
-        await saveToSheet(newOrder)
-        
+        const saveResult = await saveToSheet(newOrder)
+
+        // Si el backend reasignó el ID (caso de colisión), usar el definitivo
+        const confirmedId = saveResult?.data?.id
+        if (confirmedId && String(confirmedId) !== String(newOrder.id)) {
+          newOrder.id = String(confirmedId)
+        }
+
         // Si el pedido viene de un pedido cliente, actualizar su estado
         if (newOrder.desdePedidoCliente && newOrder.idPedidoCliente) {
           try {
@@ -3536,88 +3543,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     setEntregaManual(false)
     setRecojoClienteAvisa(false)
     setEntregaClienteAvisa(false)
-  }
-
-  // Componente del modal de advertencia para ASIGNAR BIKER
-  const AssignBikerWarningModal = () => {
-    if (!showAssignBikerModal) return null
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div className="assign-biker-modal" style={{
-          backgroundColor: 'white',
-          padding: '30px',
-          borderRadius: '12px',
-          maxWidth: '450px',
-          width: '90%',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            fontSize: '48px',
-            marginBottom: '20px'
-          }}>
-            ⚠️
-          </div>
-          
-          <h2 style={{ 
-            color: '#dc3545', 
-            margin: '0 0 20px 0',
-            fontSize: '24px',
-            fontWeight: '600'
-          }}>
-            Asignar Biker para Enviar Mensaje
-          </h2>
-          
-          <p style={{
-            fontSize: '16px',
-            color: '#6c757d',
-            lineHeight: '1.6',
-            marginBottom: '30px'
-          }}>
-            Para enviar un mensaje por WhatsApp, debes seleccionar un biker específico con número de teléfono asociado.
-            <br/><br/>
-            <strong>"ASIGNAR BIKER"</strong> es solo un marcador temporal y no tiene WhatsApp disponible.
-          </p>
-          
-          <div style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'center'
-          }}>
-            <button 
-              onClick={() => setShowAssignBikerModal(false)}
-              style={{
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#5a6268'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#6c757d'}
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   const renderTabContent = () => {
@@ -4907,39 +4832,19 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
               <input type="hidden" name="direccion_recojo" value={form.direccion_recojo} />
               <input type="hidden" name="direccion_entrega" value={form.direccion_entrega} />
 
-              {/* PREVIEW DE WHATSAPP */}
+              {/* PREVIEW DE WHATSAPP (solo lectura) */}
               {(form.cliente || form.recojo || form.entrega) && (
                 <div className="form-section">
-                  <h3 className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="section-title">
                     <span>📱 Vista Previa de WhatsApp</span>
-                    {whatsappMessageEdited && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Al cambiar whatsappMessageEdited a false, el useEffect regenerará el mensaje automáticamente
-                          setWhatsappMessageEdited(false)
-                        }}
-                        style={{
-                          fontSize: '12px',
-                          padding: '4px 12px',
-                          background: '#0ea5e9',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        🔄 Restaurar mensaje original
-                      </button>
-                    )}
                   </h3>
+                  <p style={{ fontSize: '12px', color: '#6c757d', margin: '-4px 0 12px' }}>
+                    El envío se hace después de crear el pedido (incluirá el ID de la carrera).
+                  </p>
                   <div className="whatsapp-preview">
                     <textarea
                       value={whatsappMessage}
-                      onChange={(e) => {
-                        setWhatsappMessage(e.target.value)
-                        setWhatsappMessageEdited(true)
-                      }}
+                      readOnly
                       placeholder="El mensaje se generará automáticamente..."
                       style={{
                         width: '100%',
@@ -4954,116 +4859,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                         color: '#075E54',
                         resize: 'vertical',
                         marginBottom: '12px',
-                        whiteSpace: 'pre-wrap'
+                        whiteSpace: 'pre-wrap',
+                        cursor: 'default'
                       }}
                     />
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <button 
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(whatsappMessage)
-                            showNotification('✅ Mensaje copiado al portapapeles', 'success')
-                          } catch (err) {
-                            // Fallback para navegadores que no soportan clipboard API
-                            const textArea = document.createElement('textarea')
-                            textArea.value = whatsappMessage
-                            textArea.style.position = 'fixed'
-                            textArea.style.left = '-999999px'
-                            document.body.appendChild(textArea)
-                            textArea.select()
-                            try {
-                              document.execCommand('copy')
-                              showNotification('✅ Mensaje copiado al portapapeles', 'success')
-                            } catch (err2) {
-                              showNotification('❌ No se pudo copiar el mensaje', 'error')
-                            }
-                            document.body.removeChild(textArea)
-                          }
-                        }}
-                        style={{
-                          background: 'var(--yellow)',
-                          color: '#333',
-                          border: 'none',
-                          padding: '12px 24px',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          boxShadow: '0 2px 8px rgba(251, 191, 36, 0.3)'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'var(--accent-light)'
-                          e.currentTarget.style.transform = 'translateY(-2px)'
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.4)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'var(--yellow)'
-                          e.currentTarget.style.transform = 'translateY(0)'
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.3)'
-                        }}
-                        title="Copiar mensaje al portapapeles"
-                      >
-                        📋 Copiar mensaje
-                      </button>
-                      <button 
-                        type="button"
-                        className="btn-whatsapp-large"
-                        onClick={() => {
-                          // Verificar si se seleccionó "ASIGNAR BIKER"
-                          if (form.biker === 'ASIGNAR BIKER') {
-                            // Mostrar modal de advertencia
-                            setShowAssignBikerModal(true)
-                            return
-                          }
-                          
-                          // Si no hay biker seleccionado
-                          if (!form.biker || form.biker.trim() === '') {
-                            toast.error('❌ NO EXISTE BIKER ASIGNADO', {
-                              position: "top-center",
-                              autoClose: 3000,
-                              hideProgressBar: false,
-                              closeOnClick: true,
-                              pauseOnHover: true,
-                              draggable: true,
-                              className: "toast-error",
-                            })
-                            return
-                          }
-                          
-                          const tempOrder = { ...form }
-                          // Usar el mensaje editado si existe
-                          const whatsappURL = generateWhatsAppURL(tempOrder, bikersAgregar, whatsappMessage)
-                          window.open(whatsappURL, '_blank')
-                          
-                          // Mostrar notificación con información del destinatario
-                            const selectedBiker = bikersAgregar.find(biker => (biker.nombre || biker) === form.biker)
-                            if (selectedBiker && selectedBiker.whatsapp && selectedBiker.whatsapp !== 'N/A') {
-                              showNotification(`📱 Enviando WhatsApp a ${form.biker} (${selectedBiker.whatsapp})`, 'success')
-                            } else {
-                              showNotification(`📱 Enviando WhatsApp a ${form.biker} (usando WhatsApp del formulario)`, 'warning')
-                          }
-                        }}
-                        disabled={!form.biker || form.biker.trim() === ''}
-                        title={
-                          !form.biker 
-                            ? 'No hay biker asignado' 
-                            : form.biker === 'ASIGNAR BIKER'
-                            ? 'ASIGNAR BIKER no tiene WhatsApp asociado'
-                            : `Enviar WhatsApp al biker ${form.biker}`
-                        }
-                        style={{
-                          opacity: (!form.biker || form.biker.trim() === '') ? 0.5 : 1,
-                          cursor: (!form.biker || form.biker.trim() === '') ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        📱 Enviar por WhatsApp {form.biker && form.biker !== 'ASIGNAR BIKER' && `a ${form.biker}`}
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}
@@ -8231,12 +8030,10 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       <OrderSuccessModal
         show={showSuccessModal}
         order={lastAddedOrder}
+        bikersAgregar={bikersAgregar}
         onStayInForm={handleStayInForm}
         onViewOrders={handleViewOrders}
       />
-      
-      {/* Modal de advertencia para ASIGNAR BIKER */}
-      <AssignBikerWarningModal />
 
       {/* Estilos CSS para el modal de resumen */}
       <style>{`

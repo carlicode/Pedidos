@@ -53,7 +53,11 @@ export const buildWhatsAppMessage = (order) => {
   const metodoPago = order.metodo_pago || 'Efectivo'
   
   // Construir el mensaje base
-  let mensaje = `🐝 Beezy dice:
+  let mensaje = ''
+  if (order.id) {
+    mensaje += `*ID: ${order.id}*\n\n`
+  }
+  mensaje += `🐝 Beezy dice:
 
 CLIENTE: ${clienteNombre}
 

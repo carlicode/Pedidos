@@ -1,13 +1,22 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Icon from './Icon.jsx'
 import { formatCurrency } from '../utils/dateUtils.js'
+import { buildWhatsAppMessage, generateWhatsAppURL } from '../utils/whatsAppUtils.js'
 
 /**
  * Modal de confirmación cuando se agrega un pedido.
  * Componente estable (no definido dentro de Orders) para evitar remounts
  * y parpadeo al recargar datos tras agregar.
  */
-export default function OrderSuccessModal({ show, order, onStayInForm, onViewOrders }) {
+export default function OrderSuccessModal({ show, order, bikersAgregar = [], onStayInForm, onViewOrders }) {
+  const [whatsappMessage, setWhatsappMessage] = useState('')
+
+  useEffect(() => {
+    if (order) {
+      setWhatsappMessage(buildWhatsAppMessage(order))
+    }
+  }, [order?.id])
+
   if (!show || !order) return null
 
   const o = order
@@ -179,6 +188,105 @@ export default function OrderSuccessModal({ show, order, onStayInForm, onViewOrd
                 </span>
               </div>
             ))}
+          </div>
+
+          {/* Mensaje de WhatsApp */}
+          <div style={{ marginTop: '20px' }}>
+            <span style={{
+              fontSize: '0.85rem',
+              fontWeight: '800',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--text)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '8px'
+            }}>
+              📱 Mensaje para el biker
+            </span>
+            <textarea
+              value={whatsappMessage}
+              onChange={(e) => setWhatsappMessage(e.target.value)}
+              style={{
+                width: '100%',
+                minHeight: '200px',
+                padding: '14px',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                lineHeight: '1.6',
+                border: '2px solid #25D366',
+                borderRadius: '10px',
+                background: '#E7FFE7',
+                color: '#075E54',
+                resize: 'vertical',
+                marginBottom: '10px',
+                whiteSpace: 'pre-wrap'
+              }}
+            />
+            {bikerPending && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--muted)', fontStyle: 'italic', margin: '0 0 10px' }}>
+                Sin biker asignado — asigna uno para poder enviar el mensaje.
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(whatsappMessage)
+                  } catch (err) {
+                    const textArea = document.createElement('textarea')
+                    textArea.value = whatsappMessage
+                    textArea.style.position = 'fixed'
+                    textArea.style.left = '-999999px'
+                    document.body.appendChild(textArea)
+                    textArea.select()
+                    try {
+                      document.execCommand('copy')
+                    } finally {
+                      document.body.removeChild(textArea)
+                    }
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: 'var(--yellow, #fbbf24)',
+                  color: '#333'
+                }}
+              >
+                📋 Copiar mensaje
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = generateWhatsAppURL(o, bikersAgregar, whatsappMessage)
+                  window.open(url, '_blank')
+                }}
+                disabled={bikerPending}
+                title={bikerPending ? 'No hay biker asignado' : `Enviar WhatsApp a ${bikerVal}`}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: bikerPending ? 'not-allowed' : 'pointer',
+                  opacity: bikerPending ? 0.5 : 1,
+                  background: '#25D366',
+                  color: '#fff'
+                }}
+              >
+                📱 Enviar por WhatsApp{!bikerPending && ` a ${bikerVal}`}
+              </button>
+            </div>
           </div>
         </div>
 
