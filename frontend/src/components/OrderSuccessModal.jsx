@@ -74,7 +74,7 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
           background: 'var(--panel)',
           color: 'var(--text)',
           borderRadius: '16px',
-          maxWidth: '480px',
+          maxWidth: '900px',
           width: '100%',
           maxHeight: '90vh',
           overflow: 'hidden',
@@ -127,7 +127,7 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
           </p>
         </div>
 
-        {/* Info grid — títulos más destacados que el contenido */}
+        {/* Info + WhatsApp — layout horizontal en dos columnas */}
         <div
           className="success-modal-info"
           style={{
@@ -135,10 +135,17 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
             overflowY: 'auto',
             flex: '1 1 auto',
             minHeight: 0,
-            background: 'var(--bg-secondary)'
+            background: 'var(--bg-secondary)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '24px',
+            alignItems: 'flex-start'
           }}
         >
+          {/* Columna izquierda: datos del pedido */}
           <div style={{
+            flex: '1 1 320px',
+            minWidth: '260px',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: '12px 20px'
@@ -190,8 +197,8 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
             ))}
           </div>
 
-          {/* Mensaje de WhatsApp */}
-          <div style={{ marginTop: '20px' }}>
+          {/* Columna derecha: mensaje de WhatsApp */}
+          <div style={{ flex: '1 1 340px', minWidth: '300px' }}>
             <span style={{
               fontSize: '0.85rem',
               fontWeight: '800',
@@ -210,7 +217,7 @@ export default function OrderSuccessModal({ show, order, bikersAgregar = [], onS
               onChange={(e) => setWhatsappMessage(e.target.value)}
               style={{
                 width: '100%',
-                minHeight: '200px',
+                minHeight: '170px',
                 padding: '14px',
                 fontFamily: 'monospace',
                 fontSize: '13px',
