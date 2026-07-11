@@ -7,6 +7,8 @@ const client = new DynamoDBClient({
 
 const docClient = DynamoDBDocumentClient.from(client);
 
+export { docClient };
+
 export async function getUserByUsername(username) {
   try {
     const result = await docClient.send(

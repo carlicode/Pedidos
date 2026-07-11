@@ -41,6 +41,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { google } from 'googleapis'
 import fs from 'fs'
+import { mirrorPedido } from './services/pedidosMirror.js'
 
 // Cargar variables de entorno desde múltiples ubicaciones
 import path from 'path'
@@ -430,6 +431,16 @@ const LOGS_HEADER_ORDER = [
 ]
 
 const LOGS_SHEET_NAME = 'Logs'
+
+// Mapea una fila (array de 31 valores) a objeto {header: valor} según HEADER_ORDER.
+// Usado por el espejo de pedidos en DynamoDB (services/pedidosMirror.js).
+function mapRowToHeaderObject(row) {
+  const obj = {}
+  HEADER_ORDER.forEach((header, i) => {
+    obj[header] = row[i] ?? ''
+  })
+  return obj
+}
 
 function quoteSheet(title) {
   return `'${String(title).replace(/'/g, "''")}'`
@@ -1934,6 +1945,9 @@ app.post('/api/orders', async (req, res) => {
         warning: `ID duplicado detectado. Original: ${orderId}, Nuevo: ${newId}`,
         existingId: orderId
       });
+
+      // Espejo en DynamoDB (best-effort, nunca falla la request)
+      await mirrorPedido(mapRowToHeaderObject(newRow), 'crear')
     } else {
       // Agregar nueva fila (flujo normal)
       // HEADER_ORDER tiene 31 columnas (A hasta AE)
@@ -1955,6 +1969,9 @@ app.post('/api/orders', async (req, res) => {
         ip: req.ip || req.connection.remoteAddress,
         userAgent: req.get('user-agent')
       });
+
+      // Espejo en DynamoDB (best-effort, nunca falla la request)
+      await mirrorPedido(mapRowToHeaderObject(row), 'crear')
     }
 
     res.json({ ok: true, updated: existingRowIndex > 0, id: order.id })
@@ -2156,6 +2173,9 @@ app.put('/api/orders/:id', async (req, res) => {
     const nuevoEstado = orderForLog['Estado'] || order.Estado || order.estado || ''
     const operacionLog = nuevoEstado ? `EDITAR (${nuevoEstado})` : 'EDITAR'
     await writeToLogsSheet(sheets, orderForLog, operacionLog, order.Operador || order.operador || 'Desconocido')
+
+    // Espejo en DynamoDB (best-effort, nunca falla la request)
+    await mirrorPedido(orderForLog, 'editar')
     
     // Registrar en audit log
     logAuditEntry('EDITAR', order, {
@@ -2767,9 +2787,16 @@ app.put('/api/update-order-status', async (req, res) => {
     })
     
     console.log(`✅ Pedido #${orderId} actualizado exitosamente en Google Sheet`)
-    
-    res.json({ 
-      success: true, 
+
+    // Espejo en DynamoDB (best-effort): mapear con los headers reales del sheet
+    const filaFinal = {}
+    headers.forEach((header, i) => {
+      if (header) filaFinal[header] = dataRows[orderIndex][i] ?? ''
+    })
+    await mirrorPedido(filaFinal, 'estado')
+
+    res.json({
+      success: true,
       message: `Pedido #${orderId} actualizado a ${newStatus}`,
       updatedCells: updateResponse.data.updatedCells
     })
