@@ -42,6 +42,8 @@ import dotenv from 'dotenv'
 import { google } from 'googleapis'
 import fs from 'fs'
 import { mirrorPedido } from './services/pedidosMirror.js'
+import { notificarAsignacionSiCambio } from './services/turboNotify.js'
+import { listActivePersonal, getPersonalTableName } from './services/personalDynamo.js'
 
 // Cargar variables de entorno desde múltiples ubicaciones
 import path from 'path'
@@ -1948,6 +1950,8 @@ app.post('/api/orders', async (req, res) => {
 
       // Espejo en DynamoDB (best-effort, nunca falla la request)
       await mirrorPedido(mapRowToHeaderObject(newRow), 'crear')
+      // Push al biker si ya viene asignado desde la creación (best-effort)
+      await notificarAsignacionSiCambio(mapRowToHeaderObject(newRow))
     } else {
       // Agregar nueva fila (flujo normal)
       // HEADER_ORDER tiene 31 columnas (A hasta AE)
@@ -1972,6 +1976,8 @@ app.post('/api/orders', async (req, res) => {
 
       // Espejo en DynamoDB (best-effort, nunca falla la request)
       await mirrorPedido(mapRowToHeaderObject(row), 'crear')
+      // Push al biker si ya viene asignado desde la creación (best-effort)
+      await notificarAsignacionSiCambio(mapRowToHeaderObject(row))
     }
 
     res.json({ ok: true, updated: existingRowIndex > 0, id: order.id })
@@ -2176,6 +2182,9 @@ app.put('/api/orders/:id', async (req, res) => {
 
     // Espejo en DynamoDB (best-effort, nunca falla la request)
     await mirrorPedido(orderForLog, 'editar')
+    // Push al biker si esta edición lo asignó/cambió (best-effort; compara
+    // contra el valor previo de la fila — beforeData se armó antes del merge)
+    await notificarAsignacionSiCambio(orderForLog, beforeData['Biker'])
     
     // Registrar en audit log
     logAuditEntry('EDITAR', order, {
@@ -2877,6 +2886,61 @@ app.post('/api/empresas', async (req, res) => {
     
   } catch (err) {
     console.error('❌ Error en /api/empresas:', err)
+    res.status(500).json({ ok: false, error: String(err) })
+  }
+})
+
+// Endpoint para LEER bikers/drivers para asignar carrera.
+// Fuente principal: DynamoDB bee-personal (solo lectura, administrada por Bee Tracked Turbo).
+// Respaldo: Google Sheet Bikers si PERSONAL_DYNAMO_TABLE no está configurada o falla la lectura.
+// POST /api/bikers (debajo) sigue escribiendo solo en el Sheet — el alta de un biker nuevo no toca Dynamo.
+app.get('/api/bikers', async (req, res) => {
+  const tableName = getPersonalTableName()
+
+  if (tableName) {
+    try {
+      const bikers = await listActivePersonal()
+      if (bikers !== null) {
+        console.log(`✅ Personal cargado desde DynamoDB (${tableName}): ${bikers.length} registros`)
+        return res.json({ ok: true, bikers: bikers.map(({ Biker, Whatsapp }) => ({ Biker, Whatsapp })), source: 'dynamo' })
+      }
+    } catch (err) {
+      console.error(`❌ Error leyendo ${tableName}, cayendo a Google Sheet:`, err.message || err)
+    }
+  } else {
+    console.log('ℹ️ PERSONAL_DYNAMO_TABLE no configurada — usando Google Sheet de bikers')
+  }
+
+  try {
+    const BIKERS_SHEET_ID = '1BM7sjDPYWYTKh93vRPkkUMZYn7g38R5IG3aJgXPc4pY'
+    const bikersSheetName = 'Bikers'
+
+    const auth = await getAuthClient()
+    await auth.authorize()
+    const sheets = google.sheets({ version: 'v4', auth })
+    const quoted = quoteSheet(bikersSheetName)
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: BIKERS_SHEET_ID,
+      range: `${quoted}!A:B`
+    })
+
+    const rows = response.data.values || []
+    const dataRows = rows.length > 0 && /biker|nombre|whatsapp/i.test(String(rows[0][0] || ''))
+      ? rows.slice(1)
+      : rows
+
+    const bikers = dataRows
+      .map(row => ({
+        Biker: (row[0] || '').toString().trim(),
+        Whatsapp: (row[1] || '').toString().trim()
+      }))
+      .filter(b => b.Biker)
+
+    console.log(`✅ Personal cargado desde Google Sheet (respaldo): ${bikers.length} registros`)
+    res.json({ ok: true, bikers, source: 'sheet' })
+  } catch (err) {
+    console.error('❌ Error en GET /api/bikers:', err)
     res.status(500).json({ ok: false, error: String(err) })
   }
 })
