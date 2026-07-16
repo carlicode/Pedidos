@@ -288,7 +288,6 @@ export default function Orders() {
   // Estado para el modal de pedido agregado
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [lastAddedOrder, setLastAddedOrder] = useState(null)
-  const [successModalIsEdit, setSuccessModalIsEdit] = useState(false)
   
   // Estado para el modal de advertencia de asignar biker
   // Estado para el modal de error de distancia
@@ -3015,15 +3014,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
           const result = await updateOrderInSheetAPI(updatedOrder)
           console.log('✅ Respuesta del servidor:', result)
           showNotification(`✅ Pedido #${updatedOrder.id} actualizado exitosamente`, 'success')
-
-          // Si el biker cambió (asignación nueva o reasignación), mostrar el
-          // mismo modal de "crear pedido" para poder enviarle el mensaje por WhatsApp
-          const bikerCambio = (editingOrder.biker || '') !== (updatedOrder.biker || '')
-          if (bikerCambio) {
-            setLastAddedOrder(updatedOrder)
-            setSuccessModalIsEdit(true)
-            setShowSuccessModal(true)
-          }
         } catch (updateError) {
           console.error('❌ Error al actualizar pedido:', updateError)
           console.error('❌ Error completo:', {
@@ -3209,7 +3199,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         
         // Mostrar modal de éxito
         setLastAddedOrder(newOrder)
-        setSuccessModalIsEdit(false)
         setShowSuccessModal(true)
       }
       
@@ -3537,7 +3526,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
     
     // Cerrar modal y cambiar al Kanban
     setShowSuccessModal(false)
-    setSuccessModalIsEdit(false)
     setActiveTab('ver')
   }
 
@@ -3545,9 +3533,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   const handleStayInForm = () => {
 
     setShowSuccessModal(false)
-    setSuccessModalIsEdit(false)
-    // Puede venir del modal mostrado tras una edición (que ya cambió a "Ver Pedidos")
-    setActiveTab('agregar')
     // Limpiar el formulario para un nuevo pedido
     setForm({ ...createInitialOrder(), operador: operadorDefault })
     // Resetear el mensaje de WhatsApp
@@ -8045,7 +8030,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       <OrderSuccessModal
         show={showSuccessModal}
         order={lastAddedOrder}
-        isEdit={successModalIsEdit}
         bikersAgregar={bikersAgregar}
         onStayInForm={handleStayInForm}
         onViewOrders={handleViewOrders}

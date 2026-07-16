@@ -3,39 +3,47 @@
  * Maneja la carga y gestión de bikers para diferentes contextos
  */
 
+import Papa from 'papaparse'
 import { loadFromEnvCSV } from './sheetsService.js'
 import { apiFetch } from '../utils/api.js'
 
 /**
- * Carga bikers/drivers para asignar a una carrera (formulario Agregar Pedido).
- * Fuente principal: DynamoDB `bee-personal` (vía backend, solo lectura).
- * Respaldo: Google Sheet de bikers si el backend cae a él (ver GET /api/bikers).
+ * Carga bikers desde Google Sheets para formulario de Agregar Pedido
  * @returns {Promise<Array>} Array de bikers con estructura completa
  * @throws {Error} Si falla la carga
  */
 export const loadBikersForAgregar = async () => {
-  const res = await apiFetch('/api/bikers')
+  const bikersUrl = import.meta.env.VITE_BIKERS_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRQ4OczeaNEWit2STNFO1e4V9aEP5JJY6TTPG3K4kRcIZhrRLLMCRIQXcccjUaL_Ltx9XTUPvE_dr9S/pub?gid=0&single=true&output=csv'
 
+  const res = await fetch(bikersUrl, { 
+    cache: 'no-store',
+    mode: 'cors',
+    headers: {
+      'Accept': 'text/csv'
+    }
+  })
+  
   if (!res.ok) {
     throw new Error('No se pudieron cargar los bikers')
   }
-
-  const data = await res.json()
-  if (!data.ok) {
-    throw new Error(data.error || 'No se pudieron cargar los bikers')
-  }
-
-  const bikersData = (data.bikers || [])
-    .filter((row) => row.Biker?.trim())
-    .map((row) => ({
-      id: row.Biker.trim(),
-      nombre: row.Biker.trim(),
-      telefono: row.Whatsapp || 'N/A',
-      whatsapp: row.Whatsapp || 'N/A',
-      linkContacto: 'N/A',
-    }))
+  
+  const csvText = await res.text()
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true })
+  
+  const bikersData = parsed.data
+    .filter(row => row.Biker?.trim() || row.biker?.trim() || row.BIKER?.trim())
+    .map(row => {
+      const biker = {
+        id: row.ID || row.id || (row.Biker || row.biker || row.BIKER),
+        nombre: (row.Biker || row.biker || row.BIKER).trim(),
+        telefono: row['Contacto'] || row['contacto'] || row.Telefono || row.telefono || 'N/A',
+        whatsapp: row['WhatsApp'] || row['whatsapp'] || row['Whatsapp'] || 'N/A',
+        linkContacto: row['Link'] || row['link'] || 'N/A'
+      }
+      return biker
+    })
     .sort((a, b) => a.nombre.localeCompare(b.nombre))
-
+  
   // Agregar "ASIGNAR BIKER" como primera opción
   const bikersConAsignar = [
     {
@@ -47,7 +55,7 @@ export const loadBikersForAgregar = async () => {
     },
     ...bikersData
   ]
-
+  
   return bikersConAsignar
 }
 

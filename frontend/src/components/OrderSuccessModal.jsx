@@ -8,7 +8,7 @@ import { buildWhatsAppMessage, generateWhatsAppURL } from '../utils/whatsAppUtil
  * Componente estable (no definido dentro de Orders) para evitar remounts
  * y parpadeo al recargar datos tras agregar.
  */
-export default function OrderSuccessModal({ show, order, isEdit = false, bikersAgregar = [], onStayInForm, onViewOrders }) {
+export default function OrderSuccessModal({ show, order, bikersAgregar = [], onStayInForm, onViewOrders }) {
   const [whatsappMessage, setWhatsappMessage] = useState('')
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function OrderSuccessModal({ show, order, isEdit = false, bikersA
               letterSpacing: '-0.02em'
             }}
           >
-            {isEdit ? '¡Biker actualizado!' : '¡Pedido agregado!'}
+            ¡Pedido agregado!
           </h2>
           <p
             id="success-modal-desc"
@@ -123,9 +123,7 @@ export default function OrderSuccessModal({ show, order, isEdit = false, bikersA
               color: 'var(--muted)'
             }}
           >
-            {isEdit
-              ? `Envía el mensaje al nuevo biker del pedido #${o.id}`
-              : `Revisa los datos del pedido #${o.id}`}
+            Revisa los datos del pedido #{o.id}
           </p>
         </div>
 
