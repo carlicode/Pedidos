@@ -2890,27 +2890,39 @@ app.post('/api/empresas', async (req, res) => {
   }
 })
 
+// Layout de la pestaña 'Bikers'. La columna ID se agregó al inicio en la
+// migración a bee-personal; antes el nombre vivía en A. Los índices viven acá
+// para que lectura (GET) y alta (POST) no se vuelvan a desincronizar.
+const BIKERS_SHEET_COLUMNS = { id: 0, biker: 1, whatsapp: 2, nacimiento: 3, rol: 4 }
+const BIKERS_SHEET_ROL_DEFAULT = 'ecodelivery'
+
 // Endpoint para LEER bikers/drivers para asignar carrera.
-// Fuente principal: DynamoDB bee-personal (solo lectura, administrada por Bee Tracked Turbo).
-// Respaldo: Google Sheet Bikers si PERSONAL_DYNAMO_TABLE no está configurada o falla la lectura.
-// POST /api/bikers (debajo) sigue escribiendo solo en el Sheet — el alta de un biker nuevo no toca Dynamo.
+// Fuentes: DynamoDB bee-personal (administrada por Bee Tracked Turbo, solo lectura) +
+// Google Sheet Bikers (donde POST /api/bikers de abajo escribe las altas hechas desde
+// este panel). Se combinan ambas para que un biker agregado acá aparezca al armar
+// pedidos sin depender de que Turbo lo importe a Dynamo.
 app.get('/api/bikers', async (req, res) => {
   const tableName = getPersonalTableName()
+  let dynamoBikers = []
+  let dynamoOk = false
 
   if (tableName) {
     try {
       const bikers = await listActivePersonal()
       if (bikers !== null) {
-        console.log(`✅ Personal cargado desde DynamoDB (${tableName}): ${bikers.length} registros`)
-        return res.json({ ok: true, bikers: bikers.map(({ Biker, Whatsapp }) => ({ Biker, Whatsapp })), source: 'dynamo' })
+        dynamoBikers = bikers.map(({ Biker, Whatsapp }) => ({ Biker, Whatsapp }))
+        dynamoOk = true
+        console.log(`✅ Personal cargado desde DynamoDB (${tableName}): ${dynamoBikers.length} registros`)
       }
     } catch (err) {
-      console.error(`❌ Error leyendo ${tableName}, cayendo a Google Sheet:`, err.message || err)
+      console.error(`❌ Error leyendo ${tableName}, seguimos solo con el Google Sheet:`, err.message || err)
     }
   } else {
     console.log('ℹ️ PERSONAL_DYNAMO_TABLE no configurada — usando Google Sheet de bikers')
   }
 
+  let sheetBikers = []
+  let sheetErr = null
   try {
     const BIKERS_SHEET_ID = '1BM7sjDPYWYTKh93vRPkkUMZYn7g38R5IG3aJgXPc4pY'
     const bikersSheetName = 'Bikers'
@@ -2920,29 +2932,48 @@ app.get('/api/bikers', async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth })
     const quoted = quoteSheet(bikersSheetName)
 
+    // La hoja tiene el layout A=ID, B=Biker, C=Whatsapp (ver BIKERS_SHEET_COLUMNS).
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: BIKERS_SHEET_ID,
-      range: `${quoted}!A:B`
+      range: `${quoted}!A:C`
     })
 
     const rows = response.data.values || []
-    const dataRows = rows.length > 0 && /biker|nombre|whatsapp/i.test(String(rows[0][0] || ''))
+    // El header se detecta sobre la fila completa: la columna A es 'ID', que no
+    // matchea el patrón, y sin esto la cabecera se colaba como si fuera un biker.
+    const dataRows = rows.length > 0 && /biker|nombre|whatsapp/i.test(rows[0].join(' '))
       ? rows.slice(1)
       : rows
 
-    const bikers = dataRows
+    sheetBikers = dataRows
       .map(row => ({
-        Biker: (row[0] || '').toString().trim(),
-        Whatsapp: (row[1] || '').toString().trim()
+        Biker: (row[BIKERS_SHEET_COLUMNS.biker] || '').toString().trim(),
+        Whatsapp: (row[BIKERS_SHEET_COLUMNS.whatsapp] || '').toString().trim()
       }))
       .filter(b => b.Biker)
 
-    console.log(`✅ Personal cargado desde Google Sheet (respaldo): ${bikers.length} registros`)
-    res.json({ ok: true, bikers, source: 'sheet' })
+    console.log(`✅ Personal cargado desde Google Sheet: ${sheetBikers.length} registros`)
   } catch (err) {
-    console.error('❌ Error en GET /api/bikers:', err)
-    res.status(500).json({ ok: false, error: String(err) })
+    sheetErr = err
+    console.error('❌ Error leyendo Google Sheet de bikers:', err)
   }
+
+  if (!dynamoOk && sheetErr) {
+    return res.status(500).json({ ok: false, error: String(sheetErr) })
+  }
+
+  // Combinar ambas fuentes, priorizando Dynamo y evitando duplicados por whatsapp normalizado.
+  const normalizeWhatsapp = (w) => String(w || '').replace(/\D/g, '')
+  const seen = new Set(dynamoBikers.map(b => normalizeWhatsapp(b.Whatsapp)).filter(Boolean))
+  const bikers = [...dynamoBikers]
+  for (const b of sheetBikers) {
+    const key = normalizeWhatsapp(b.Whatsapp)
+    if (key && seen.has(key)) continue
+    if (key) seen.add(key)
+    bikers.push(b)
+  }
+
+  res.json({ ok: true, bikers, source: dynamoOk ? 'dynamo+sheet' : 'sheet' })
 })
 
 // Endpoint para agregar bikers
@@ -2972,18 +3003,22 @@ app.post('/api/bikers', async (req, res) => {
     // Asegurar que la hoja existe
     await ensureSheetExists(sheets, BIKERS_SHEET_ID, bikersSheetName)
     
-    // Preparar los datos para la fila
-    const row = [
-      biker.Biker || '',
-      biker.Whatsapp || ''
-    ]
-    
+    // Preparar los datos para la fila respetando el layout real de la hoja
+    // (A=ID, B=Biker, C=Whatsapp, D=Nacimiento, E=Rol). El ID lo asigna
+    // bee-personal, así que acá va vacío.
+    const row = []
+    row[BIKERS_SHEET_COLUMNS.id] = ''
+    row[BIKERS_SHEET_COLUMNS.biker] = biker.Biker || ''
+    row[BIKERS_SHEET_COLUMNS.whatsapp] = biker.Whatsapp || ''
+    row[BIKERS_SHEET_COLUMNS.nacimiento] = ''
+    row[BIKERS_SHEET_COLUMNS.rol] = BIKERS_SHEET_ROL_DEFAULT
+
     console.log('📊 Fila de biker para el sheet:', row)
-    
+
     // Agregar nueva fila
     await sheets.spreadsheets.values.append({
       spreadsheetId: BIKERS_SHEET_ID,
-      range: `${quoted}!A:B`,
+      range: `${quoted}!A:E`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [row] }
