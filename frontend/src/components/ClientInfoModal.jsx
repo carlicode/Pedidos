@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react';
 import '../styles/ClientInfoModal.css';
 import { getApiUrl } from '../utils/api.js';
 
+const CAMPOS = [
+  ['cuenta', 'Cuenta'],
+  ['procedimientos', 'Procedimientos'],
+  ['etiqueta', 'Etiqueta'],
+  ['envios', 'Envíos'],
+  ['tipoPago', 'Tipo de pago'],
+]
+
 export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteToDetalles }) {
   const [clientInfo, setClientInfo] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,12 +53,11 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
   };
 
   const buildDetallesText = (info) => {
-    const parts = []
-    const descripcion = (info.descripcion || info.cuenta || '').trim()
-    const mapa = (info.mapa || '').trim()
-    if (descripcion) parts.push(descripcion)
-    if (mapa) parts.push(mapa)
-    return parts.join('\n')
+    return CAMPOS
+      .map(([campo, etiqueta]) => [etiqueta, (info[campo] || '').trim()])
+      .filter(([, valor]) => valor)
+      .map(([etiqueta, valor]) => `${etiqueta}: ${valor}`)
+      .join('\n')
   }
 
   const handlePasteToDetalles = (info) => {
@@ -99,27 +106,15 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
                 <div key={index} className="client-info-card">
                   <div className="card-header">
                     <h3>{info.nombreCliente}</h3>
-                    {info.fuente && (
-                      <span className="value tag">{info.fuente}</span>
-                    )}
                   </div>
 
                   <div className="card-body">
-                    <div className="info-row">
-                      <span className="label">Descripción:</span>
-                      <span className="value">{info.descripcion || '-'}</span>
-                    </div>
-
-                    {info.mapa && (
-                      <div className="info-row">
-                        <span className="label">Mapa:</span>
-                        <span className="value">
-                          <a href={info.mapa} target="_blank" rel="noopener noreferrer">
-                            Ver en Google Maps
-                          </a>
-                        </span>
+                    {CAMPOS.map(([campo, etiqueta]) => (
+                      <div key={campo} className="info-row">
+                        <span className="label">{etiqueta}:</span>
+                        <span className="value">{(info[campo] || '').trim() || '-'}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
               ))}
