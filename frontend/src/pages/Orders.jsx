@@ -1223,10 +1223,19 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
       })
       .then((data) => {
         const list = data.data || []
-        const conDescripcion = list.filter((item) => item.descripcion?.trim())
-        if (conDescripcion.length > 0) {
+        // El sheet tiene clientes con la fila creada pero sin datos: el botón se
+        // habilita si hay coincidencia, y el aviso solo suena si hay algo que leer.
+        const CAMPOS_INFO = ['cuenta', 'procedimientos', 'etiqueta', 'envios', 'tipoPago']
+        const conDatos = list.filter((item) =>
+          CAMPOS_INFO.some((campo) => (item[campo] || '').trim())
+        )
+        if (list.length > 0) {
           setHasClientInfo(true)
           setClientInfoError(null)
+        } else {
+          setHasClientInfo(false)
+        }
+        if (conDatos.length > 0) {
           if (notificationAudioRef.current) {
             notificationAudioRef.current.currentTime = 0
             notificationAudioRef.current.play().catch(() => {})
@@ -1239,8 +1248,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             pauseOnHover: true,
             draggable: true,
           })
-        } else {
-          setHasClientInfo(false)
         }
       })
       .catch((err) => {
@@ -3812,7 +3819,7 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                                 ? clientInfoError
                               : hasClientInfo
                                 ? 'Ver información del cliente'
-                                : 'No hay información de este cliente en el sheet'
+                                : 'Este cliente no está en la hoja de clientes'
                         }
                         disabled={!form.cliente || form.cliente === '__CUSTOM__' || checkingClientInfo || !hasClientInfo}
                         style={{
