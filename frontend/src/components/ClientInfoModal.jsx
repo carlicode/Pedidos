@@ -106,6 +106,9 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
                 <div key={index} className="client-info-card">
                   <div className="card-header">
                     <h3>{info.nombreCliente}</h3>
+                    {info.aproximado && (
+                      <span className="value tag">coincidencia aproximada</span>
+                    )}
                   </div>
 
                   <div className="card-body">

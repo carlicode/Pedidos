@@ -34,18 +34,52 @@ function normalize(value) {
     .trim();
 }
 
+/** Distancia de Levenshtein, con corte temprano para nombres de largo muy distinto */
+function levenshtein(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** true si `corto` aparece dentro de `largo` como palabra completa */
+function contienePalabra(largo, corto) {
+  const escaped = corto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`).test(largo);
+}
+
 /**
- * Devuelve el nivel de coincidencia entre el nombre del sheet y el buscado.
- * 3 = exacto, 2 = uno empieza con el otro, 1 = uno contiene al otro, 0 = no coincide.
+ * Nivel de coincidencia entre el nombre del sheet y el buscado.
+ * 3 = exacto | 2 = uno contiene al otro como palabra completa | 1 = typo de una letra | 0 = no coincide
+ *
+ * El limite de palabra evita falsos positivos como "Saiko no manga" -> "aiko"
+ * o "Tora" -> "Consultora Sevilla"; el nivel 1 rescata "Qhathu" -> "Qhatu".
  */
 function matchLevel(nombreSheet, buscado) {
   const a = normalize(nombreSheet);
   const b = normalize(buscado);
   if (!a || !b) return 0;
   if (a === b) return 3;
-  if (a.startsWith(b) || b.startsWith(a)) return 2;
-  // Evita falsos positivos con nombres muy cortos ("fati" dentro de cualquier frase)
-  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) return 1;
+
+  const [largo, corto] = a.length >= b.length ? [a, b] : [b, a];
+  if (corto.length >= 4 && contienePalabra(largo, corto)) return 2;
+
+  const sinEspacios = [a.replace(/ /g, ''), b.replace(/ /g, '')];
+  if (Math.max(sinEspacios[0].length, sinEspacios[1].length) >= 6 &&
+      levenshtein(sinEspacios[0], sinEspacios[1]) <= 1) {
+    return 1;
+  }
+
   return 0;
 }
 
@@ -147,6 +181,7 @@ router.get('/:clientName', async (req, res) => {
         envios: cell(row, 'envios'),
         tipoPago: cell(row, 'tipoPago'),
         fuente: sheetName,
+        aproximado: nivel < 3,
       });
     }
 
