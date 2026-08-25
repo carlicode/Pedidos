@@ -52,6 +52,8 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
     }
   };
 
+  const tieneDatos = (info) => CAMPOS.some(([campo]) => (info[campo] || '').trim())
+
   const buildDetallesText = (info) => {
     return CAMPOS
       .map(([campo, etiqueta]) => [etiqueta, (info[campo] || '').trim()])
@@ -112,12 +114,20 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
                   </div>
 
                   <div className="card-body">
-                    {CAMPOS.map(([campo, etiqueta]) => (
-                      <div key={campo} className="info-row">
-                        <span className="label">{etiqueta}:</span>
-                        <span className="value">{(info[campo] || '').trim() || '-'}</span>
+                    {tieneDatos(info) ? (
+                      CAMPOS.map(([campo, etiqueta]) => (
+                        <div key={campo} className="info-row">
+                          <span className="label">{etiqueta}:</span>
+                          <span className="value">{(info[campo] || '').trim() || '-'}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="info-row sin-datos">
+                        <span className="value">
+                          El cliente está en la hoja, pero todavía no tiene datos cargados.
+                        </span>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               ))}

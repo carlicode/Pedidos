@@ -227,3 +227,8 @@
     text-align: left;
   }
 }
+
+.client-info-card .info-row.sin-datos {
+  color: #6b7280;
+  font-style: italic;
+}
