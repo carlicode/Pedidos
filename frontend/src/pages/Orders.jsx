@@ -8405,10 +8405,18 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
         isOpen={showClientInfoModal}
         onClose={() => setShowClientInfoModal(false)}
         clientName={form.cliente}
-        onPasteToDetalles={(text) => {
-          setForm((prev) => ({ ...prev, detalles_carrera: text }))
+        onPasteToDetalles={({ detalles, metodoPago }) => {
+          setForm((prev) => ({
+            ...prev,
+            ...(detalles ? { detalles_carrera: detalles } : {}),
+            ...(metodoPago ? { metodo_pago: metodoPago } : {}),
+          }))
           setShowClientInfoModal(false)
-          toast.success('Info pegada en Detalles de la Carrera', {
+          const aplicado = [
+            detalles && 'Detalles de la Carrera',
+            metodoPago && `Método de Pago (${metodoPago})`,
+          ].filter(Boolean)
+          toast.success(`Info aplicada en ${aplicado.join(' y ')}`, {
             position: 'top-right',
             autoClose: 3000,
           })

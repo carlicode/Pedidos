@@ -54,21 +54,50 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
 
   const tieneDatos = (info) => CAMPOS.some(([campo]) => (info[campo] || '').trim())
 
+  // TIPO DE PAGO del sheet -> opciones del select (Efectivo, Cuenta, A cuenta, QR, Cortesía).
+  // 'efectivo/ qr' es ambiguo y 'detalle /tranferencia' no tiene equivalente:
+  // en ambos casos el campo se deja vacío para que lo elija el operador.
+  const METODO_PAGO_POR_TIPO = {
+    'efectivo': 'Efectivo',
+    'qr': 'QR',
+  }
+
+  // Va a Detalles de la Carrera en vez de al select, por no tener opción equivalente
+  const TIPO_PAGO_A_DETALLES = ['detalle /tranferencia']
+
+  const normalizar = (valor) => (valor || '').trim().toLowerCase()
+
+  /** Solo PROCEDIMIENTOS; el tipo de pago sin opción en el select se anexa como nota */
   const buildDetallesText = (info) => {
-    return CAMPOS
-      .map(([campo, etiqueta]) => [etiqueta, (info[campo] || '').trim()])
-      .filter(([, valor]) => valor)
-      .map(([etiqueta, valor]) => `${etiqueta}: ${valor}`)
-      .join('\n')
+    const lineas = []
+    const procedimientos = (info.procedimientos || '').trim()
+    if (procedimientos) lineas.push(procedimientos)
+
+    const tipoPago = (info.tipoPago || '').trim()
+    if (TIPO_PAGO_A_DETALLES.includes(normalizar(tipoPago))) {
+      lineas.push(`Tipo de pago: ${tipoPago}`)
+    }
+
+    return lineas.join('\n')
+  }
+
+  /** La columna CUENTA manda sobre TIPO DE PAGO cuando ambas están llenas */
+  const buildMetodoPago = (info) => {
+    if ((info.cuenta || '').trim()) return 'Cuenta'
+    return METODO_PAGO_POR_TIPO[normalizar(info.tipoPago)] || ''
   }
 
   const handlePasteToDetalles = (info) => {
-    const text = buildDetallesText(info)
-    if (!text || !onPasteToDetalles) return
-    onPasteToDetalles(text)
+    if (!onPasteToDetalles) return
+    const detalles = buildDetallesText(info)
+    const metodoPago = buildMetodoPago(info)
+    if (!detalles && !metodoPago) return
+    onPasteToDetalles({ detalles, metodoPago })
   }
 
-  const primaryInfo = clientInfo.find((info) => buildDetallesText(info))
+  const primaryInfo = clientInfo.find(
+    (info) => buildDetallesText(info) || buildMetodoPago(info)
+  )
 
   if (!isOpen) return null;
 
@@ -142,7 +171,7 @@ export default function ClientInfoModal({ isOpen, onClose, clientName, onPasteTo
               className="btn-paste-detalles"
               onClick={() => handlePasteToDetalles(primaryInfo)}
             >
-              📋 Pegar en Detalles de la Carrera
+              📋 Autocompletar formulario
             </button>
           )}
           <button className="btn-secondary" onClick={onClose}>
