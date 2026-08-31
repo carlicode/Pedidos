@@ -199,6 +199,76 @@ node scripts/test-session-management.mjs
 - ✅ DynamoDB (persistencia de usuarios)
 - ✅ WhatsApp (notificaciones)
 
+## 📐 Cálculo de distancia y precio
+
+Qué pasa, técnicamente, cuando el operador pega dos enlaces de Google Maps y aprieta calcular.
+
+### 1. Limpieza y validación (frontend)
+
+`utils/distanceCalculator.js` · `hooks/useDistanceCalculation.js`
+
+`cleanGoogleMapsUrl()` quita espacios, paréntesis y basura pegada al inicio o final. `isValidMapsUrl()` rechaza lo que no sea un enlace de Maps antes de gastar una llamada a la API.
+
+### 2. Enlace → coordenadas (backend)
+
+`GET /api/distance-proxy?origins=<url>&destinations=<url>` → `expandUrlAndExtractCoordsCached()` en `backend/index.js`
+
+Por cada enlace, en este orden:
+
+1. **Buscar coordenadas en la URL** con 10 patrones regex, del más preciso al menos preciso:
+   - `!8m2!3d<lat>!4d<lng>` — coordenadas del lugar, las más exactas
+   - `!3d!4d`, `/search/lat,lng`, `q=`, `ll=`, `center=`
+   - `@lat,lng,zoom` y `@lat,lng` — **el viewport de la cámara, no el lugar**; van al final justamente por eso
+2. **Expandir el enlace corto** si es `maps.app.goo.gl`: un `GET` con `redirect: follow` (timeout 3 s) y se vuelven a aplicar los 10 patrones sobre la URL larga.
+3. **Re-expandir** si la URL larga salió con el formato roto `/place//data=`.
+4. **Geocodificar** el nombre del lugar sacado de `/place/<nombre>/` como último recurso.
+
+Resultado: un string `"lat,lng"`. Se cachea 5 minutos (`urlExpansionCache`, máximo 100 entradas), así que pegar el mismo enlace dos veces no vuelve a expandirlo.
+
+### 3. Coordenadas → distancia (backend)
+
+`getShortestDrivingRoute()`
+
+- Si **no** son coordenadas: **Directions API** con `alternatives=true` y se elige la ruta de **menor distancia** entre las alternativas (no la más rápida). Timeout 5 s.
+- Si son coordenadas, o si Directions falla: **Distance Matrix API**.
+- Ambas en `mode=driving`.
+
+La respuesta se normaliza siempre al formato de Distance Matrix (`rows[0].elements[0].distance.value` en metros), sin importar de cuál de las dos APIs salió.
+
+### 4. Distancia → km (frontend)
+
+```js
+distanceKm = (metros / 1000) + 0.025   // DISTANCE_BUFFER_KM, margen por percances
+```
+
+### 5. Km → precio (frontend)
+
+`utils/priceCalculator.js` — **el único lugar donde vive la fórmula**. Los km se redondean **hacia arriba** (`Math.ceil`).
+
+| Medio | Hasta 1 km | Km adicional | Fórmula |
+|---|---|---|---|
+| Bicicleta | 8 Bs | 2,50 Bs | `8 + (km−1) × 2,5` |
+| Scooter | 8 Bs | 2,50 Bs | igual que Bicicleta |
+| Cargo | 14 Bs | 2,50 Bs | `Bicicleta + 6` |
+| Beezero (auto) | 10 Bs | 3,00 Bs | `10 + (km−1) × 3` |
+
+Cualquier otro medio devuelve 0.
+
+**Ejemplo:** 3.740 m → 3,74 km → +0,025 = 3,765 → `Math.ceil` = 4 km → `8 + 3 × 2,5` = **15,50 Bs**.
+
+El **método de pago no altera el monto** (Efectivo, Cuenta, A cuenta, QR y Cortesía cobran igual). El precio es editable a mano: eso activa `precioEditadoManualmente`, que bloquea el recálculo — pero el flag se resetea al recalcular la distancia.
+
+### 6. Guardado
+
+El backend **no recalcula el precio**: guarda el `precio_bs` que recibe. La validación es solo del lado del cliente.
+
+### Detalles a tener en cuenta
+
+- La distancia de **bicicleta se mide en modo auto**: ignora ciclovías, contramanos y atajos.
+- El buffer de 0,025 km se suma **antes** del `Math.ceil`, así que una distancia real de 3,99 km se cobra como 5 km.
+- Los patrones `@lat,lng` devuelven el centro del mapa, no el lugar. Si el enlace no trae coordenadas de lugar, la distancia sale aproximada.
+- Los **precios especiales por cliente** que figuran en el sheet de clientes (`tabla`, `Bs10,50`, `2bs más`, rangos) **no están implementados**: se aplican a mano.
+
 ## 🛠️ Scripts Disponibles
 
 ### Monorepo (Raíz)
