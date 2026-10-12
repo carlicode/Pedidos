@@ -4062,7 +4062,7 @@ app.get('/api/audit/order/:id', async (req, res) => {
     }
     
     const { getAuditLogsForOrder } = await import('./utils/auditLogger.js');
-    const logs = getAuditLogsForOrder(orderId);
+    const logs = await getAuditLogsForOrder(orderId);
     
     res.json({
       success: true,
@@ -4085,7 +4085,7 @@ app.get('/api/audit/order/:id', async (req, res) => {
 app.get('/api/audit/stats', async (req, res) => {
   try {
     const { getAuditStats } = await import('./utils/auditLogger.js');
-    const stats = getAuditStats();
+    const stats = await getAuditStats();
     
     res.json({
       success: true,
@@ -4106,7 +4106,7 @@ app.get('/api/audit/stats', async (req, res) => {
 app.get('/api/audit/files', async (req, res) => {
   try {
     const { listAuditLogFiles } = await import('./utils/auditLogger.js');
-    const files = listAuditLogFiles();
+    const files = await listAuditLogFiles();
     
     res.json({
       success: true,
