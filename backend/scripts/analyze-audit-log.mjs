@@ -10,13 +10,18 @@
 
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuración
-const AUDIT_LOG_PATH = path.join(__dirname, '..', 'logs', 'audit', 'audit-log.json');
+const AUDIT_DIR = process.env.AUDIT_LOGS_DIR || path.join(__dirname, '..', 'logs', 'audit');
+const AUDIT_LOG_JSONL_PATH = path.join(AUDIT_DIR, 'audit-log.jsonl'); // Formato actual (JSON Lines)
+const AUDIT_LOG_LEGACY_PATH = path.join(AUDIT_DIR, 'audit-log.json'); // Formato viejo (fallback)
+// Ruta que se muestra en los resultados (la que realmente se leyó)
+let AUDIT_LOG_PATH = AUDIT_LOG_JSONL_PATH;
 
 // Colores para terminal
 const colors = {
@@ -49,15 +54,39 @@ function subheader(text) {
 /**
  * Cargar audit log
  */
-function loadAuditLog() {
+async function loadAuditLog() {
   try {
-    if (!fs.existsSync(AUDIT_LOG_PATH)) {
-      console.error(c('red', `❌ No se encontró el archivo: ${AUDIT_LOG_PATH}`));
+    let logs = [];
+
+    if (fs.existsSync(AUDIT_LOG_JSONL_PATH)) {
+      // Formato actual: rotados (más viejos primero) + archivo actual, línea por línea
+      const rotated = fs.readdirSync(AUDIT_DIR)
+        .filter(f => /^audit-log-\d{4}-.*\.jsonl$/.test(f))
+        .sort()
+        .map(f => path.join(AUDIT_DIR, f));
+
+      for (const filePath of [...rotated, AUDIT_LOG_JSONL_PATH]) {
+        const rl = readline.createInterface({
+          input: fs.createReadStream(filePath, { encoding: 'utf8' }),
+          crlfDelay: Infinity
+        });
+        for await (const line of rl) {
+          if (!line.trim()) continue;
+          try {
+            logs.push(JSON.parse(line));
+          } catch {
+            // Línea corrupta: se saltea
+          }
+        }
+      }
+    } else if (fs.existsSync(AUDIT_LOG_LEGACY_PATH)) {
+      // Fallback: formato legacy (un array JSON)
+      AUDIT_LOG_PATH = AUDIT_LOG_LEGACY_PATH;
+      logs = JSON.parse(fs.readFileSync(AUDIT_LOG_LEGACY_PATH, 'utf8'));
+    } else {
+      console.error(c('red', `❌ No se encontró el archivo: ${AUDIT_LOG_JSONL_PATH} (ni el legacy audit-log.json)`));
       process.exit(1);
     }
-
-    const content = fs.readFileSync(AUDIT_LOG_PATH, 'utf8');
-    const logs = JSON.parse(content);
     
     console.log(c('green', `✅ Audit log cargado: ${logs.length} entradas`));
     console.log(c('cyan', `   Archivo: ${AUDIT_LOG_PATH}`));
@@ -328,10 +357,10 @@ function displayResults(stats, logs) {
 /**
  * Main
  */
-function main() {
+async function main() {
   console.log(c('bright', '\n🔍 ANÁLISIS DEL AUDIT LOG DE CARRERAS\n'));
   
-  const logs = loadAuditLog();
+  const logs = await loadAuditLog();
   const stats = analyzeLogs(logs);
   displayResults(stats, logs);
 }

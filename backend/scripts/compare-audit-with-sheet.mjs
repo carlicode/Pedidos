@@ -7,6 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import readline from 'readline';
 import { fileURLToPath } from 'url';
 import { google } from 'googleapis';
 
@@ -14,7 +15,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuración
-const AUDIT_LOG_PATH = path.join(__dirname, '..', 'logs', 'audit', 'audit-log.json');
+const AUDIT_DIR = process.env.AUDIT_LOGS_DIR || path.join(__dirname, '..', 'logs', 'audit');
+const AUDIT_LOG_JSONL_PATH = path.join(AUDIT_DIR, 'audit-log.jsonl'); // Formato actual (JSON Lines)
+const AUDIT_LOG_LEGACY_PATH = path.join(AUDIT_DIR, 'audit-log.json'); // Formato viejo (fallback)
 const SHEET_ID = process.env.SHEET_ID || '1_eDCxH_lNGzPMDEL6_NqCBdDk5eUO-tZuGZQEGNHpSs';
 
 // Cargar credenciales desde secrets
@@ -63,15 +66,38 @@ function color(col, text) {
 /**
  * Cargar audit log
  */
-function loadAuditLog() {
+async function loadAuditLog() {
   try {
-    if (!fs.existsSync(AUDIT_LOG_PATH)) {
+    let logs = [];
+
+    if (fs.existsSync(AUDIT_LOG_JSONL_PATH)) {
+      // Formato actual: rotados (más viejos primero) + archivo actual, línea por línea
+      const rotated = fs.readdirSync(AUDIT_DIR)
+        .filter(f => /^audit-log-\d{4}-.*\.jsonl$/.test(f))
+        .sort()
+        .map(f => path.join(AUDIT_DIR, f));
+
+      for (const filePath of [...rotated, AUDIT_LOG_JSONL_PATH]) {
+        const rl = readline.createInterface({
+          input: fs.createReadStream(filePath, { encoding: 'utf8' }),
+          crlfDelay: Infinity
+        });
+        for await (const line of rl) {
+          if (!line.trim()) continue;
+          try {
+            logs.push(JSON.parse(line));
+          } catch {
+            // Línea corrupta: se saltea
+          }
+        }
+      }
+    } else if (fs.existsSync(AUDIT_LOG_LEGACY_PATH)) {
+      // Fallback: formato legacy (un array JSON)
+      logs = JSON.parse(fs.readFileSync(AUDIT_LOG_LEGACY_PATH, 'utf8'));
+    } else {
       console.log(color('yellow', '⚠️  No se encontró audit log. El sistema se activó recientemente.'));
       return [];
     }
-
-    const content = fs.readFileSync(AUDIT_LOG_PATH, 'utf8');
-    const logs = JSON.parse(content);
     
     console.log(color('green', `✅ Audit log cargado: ${logs.length} entradas`));
     
@@ -130,7 +156,7 @@ async function main() {
   const credentials = await loadCredentials();
   
   // Cargar datos
-  const logs = loadAuditLog();
+  const logs = await loadAuditLog();
   
   if (logs.length === 0) {
     console.log('');
