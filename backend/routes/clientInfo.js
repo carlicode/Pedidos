@@ -2,6 +2,7 @@ import express from 'express';
 import { google } from 'googleapis';
 import { getGoogleServiceAccountJson, getSecret } from '../utils/secrets.js';
 import { normalize, matchLevel } from '../utils/clientMatch.js';
+import { getClientesInfoTableName, buscarClientePorNombre } from '../services/clientesInfo.js';
 
 const router = express.Router();
 
@@ -80,6 +81,13 @@ router.get('/:clientName', async (req, res) => {
     const { clientName } = req.params;
     if (!clientName || !clientName.trim()) {
       return res.status(400).json({ error: 'Nombre del cliente es requerido' });
+    }
+
+    // Kill-switch: con tabla configurada la DB es la fuente de verdad; sin tabla, se lee el Sheet como siempre
+    if (getClientesInfoTableName()) {
+      const data = await buscarClientePorNombre(clientName);
+      console.log(`✅ Encontrados ${data.length} registros para "${clientName}" (DynamoDB)`);
+      return res.json({ data });
     }
 
     const { sheetId, sheetName } = await getSheetConfig();

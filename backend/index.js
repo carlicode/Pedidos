@@ -190,6 +190,8 @@ app.use(express.static(path.join(__dirname, '..')))
 import authRoutes from './routes/auth.js'
 import notesRoutes from './routes/notes.js'
 import clientInfoRoutes from './routes/clientInfo.js'
+import clientesInfoRoutes from './routes/clientesInfo.js'
+import { verifyToken } from './middleware/auth.js'
 
 // Importar funciones para obtener secretos de AWS
 import { getSecrets } from './utils/secrets.js'
@@ -322,6 +324,9 @@ app.use('/api/notes', notesRoutes)
 
 // Rutas de información de clientes
 app.use('/api/client-info', clientInfoRoutes)
+
+// CRUD de info de clientes en DynamoDB (requiere JWT)
+app.use('/api/clientes-info', verifyToken, clientesInfoRoutes)
 
 // Health check endpoints
 import { healthCheck, readinessCheck, livenessCheck } from './utils/healthCheck.js'
