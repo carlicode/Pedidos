@@ -315,12 +315,98 @@ async function getReadablePaths(dir) {
   return [path.join(dir, LOG_FILENAME), ...rotated.map(name => path.join(dir, name))];
 }
 
+// ---------------------------------------------------------------------------
+// Protección de los endpoints de lectura (/api/audit/*, sin autenticación):
+// - Una sola lectura de archivos a la vez (cola global, compartida por los 3 lectores).
+// - Caché con vencimiento para stats y files, con promesa en curso compartida.
+// Las ESCRITURAS (logAuditEntry) no pasan por nada de esto y nunca esperan a un lector.
+// ---------------------------------------------------------------------------
+
+const DEFAULT_CACHE_TTL_MS = 60000; // 60 s
+
+/**
+ * TTL de la caché (se lee en cada llamada). 0 desactiva la caché.
+ */
+function getCacheTtlMs() {
+  const raw = process.env.AUDIT_CACHE_TTL_MS;
+  if (raw === undefined || raw === '') return DEFAULT_CACHE_TTL_MS;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : DEFAULT_CACHE_TTL_MS;
+}
+
+// Cola de lecturas: como máximo UNA lectura de archivos a la vez. Nunca queda rechazada.
+let readQueue = Promise.resolve();
+
+/**
+ * Ejecuta fn cuando no hay otra lectura en curso (las demás esperan en cola).
+ * Si fn falla, la promesa devuelta rechaza pero la cola sigue funcionando.
+ */
+function runExclusiveRead(fn) {
+  const run = readQueue.then(fn);
+  readQueue = run.then(() => {}, () => {});
+  return run;
+}
+
+// Todas las cachés creadas, para poder vaciarlas desde los tests
+const cachedReaders = [];
+
+/**
+ * Envuelve una función de cálculo con caché por directorio de logs + promesa en curso compartida.
+ * compute() debe devolver { value, cacheable } y no lanzar; solo se guarda en caché si
+ * cacheable es true (un error, un null o un resultado parcial NO se guardan).
+ */
+function createCachedReader(compute) {
+  const cache = new Map(); // dir -> { value, at }
+  const inflight = new Map(); // dir -> Promise
+  cachedReaders.push({ cache, inflight });
+
+  return function read() {
+    const dir = getLogsDir(); // La clave incluye el directorio (AUDIT_LOGS_DIR se lee en cada llamada)
+    const ttl = getCacheTtlMs();
+
+    const cached = cache.get(dir);
+    if (ttl > 0 && cached && Date.now() - cached.at < ttl) {
+      return Promise.resolve(cached.value);
+    }
+
+    // Si ya hay un cálculo en curso, todas esperan ESA MISMA promesa (incluso con TTL 0)
+    if (inflight.has(dir)) return inflight.get(dir);
+
+    const promise = (async () => {
+      try {
+        const { value, cacheable } = await runExclusiveRead(compute);
+        if (cacheable && ttl > 0) cache.set(dir, { value, at: Date.now() });
+        return value;
+      } finally {
+        if (inflight.get(dir) === promise) inflight.delete(dir);
+      }
+    })();
+    inflight.set(dir, promise);
+    return promise;
+  };
+}
+
+/**
+ * Vacía las cachés y las promesas en curso. SOLO PARA TESTS.
+ */
+export function __resetAuditCacheForTests() {
+  for (const reader of cachedReaders) {
+    reader.cache.clear();
+    reader.inflight.clear();
+  }
+}
+
 /**
  * Obtener logs de auditoría para un pedido específico
+ * (sin caché; una sola lectura de archivos a la vez)
  * @param {string} orderId - ID del pedido
  * @returns {Promise<Array>} Array de entradas de log para ese pedido
  */
-export async function getAuditLogsForOrder(orderId) {
+export function getAuditLogsForOrder(orderId) {
+  return runExclusiveRead(() => readAuditLogsForOrder(orderId));
+}
+
+async function readAuditLogsForOrder(orderId) {
   try {
     const dir = await ensureLogsDirectory();
     const results = [];
@@ -350,12 +436,19 @@ export async function getAuditLogsForOrder(orderId) {
 }
 
 /**
- * Obtener estadísticas de auditoría
+ * Obtener estadísticas de auditoría (caché con TTL + una sola lectura a la vez)
  * @returns {Promise<Object|null>} Estadísticas
  */
-export async function getAuditStats() {
+export const getAuditStats = createCachedReader(computeAuditStats);
+
+/**
+ * Recorre los archivos y arma las estadísticas. Nunca lanza.
+ * @returns {Promise<{value: Object|null, cacheable: boolean}>}
+ */
+async function computeAuditStats() {
   try {
     const dir = await ensureLogsDirectory();
+    let partial = false; // true si algún archivo no se pudo leer (no se cachea un resultado parcial)
     
     const stats = {
       totalOperations: 0,
@@ -404,23 +497,31 @@ export async function getAuditStats() {
           }
         }
       } catch (error) {
+        partial = true;
         console.error(`⚠️ Error procesando ${path.basename(filePath)}:`, error.message);
       }
     }
     
-    return stats;
+    return { value: stats, cacheable: !partial };
     
   } catch (error) {
     console.error('❌ Error obteniendo estadísticas:', error);
-    return null;
+    return { value: null, cacheable: false };
   }
 }
 
 /**
  * Listar archivos de audit log disponibles (actual + rotados + legacy)
+ * (caché con TTL + una sola lectura a la vez)
  * @returns {Promise<Object>} Información de archivos
  */
-export async function listAuditLogFiles() {
+export const listAuditLogFiles = createCachedReader(computeAuditLogFiles);
+
+/**
+ * Arma el listado de archivos. Nunca lanza.
+ * @returns {Promise<{value: Object, cacheable: boolean}>}
+ */
+async function computeAuditLogFiles() {
   try {
     const dir = await ensureLogsDirectory();
     
@@ -499,11 +600,12 @@ export async function listAuditLogFiles() {
       if (error.code !== 'ENOENT') throw error;
     }
     
-    return result;
+    return { value: result, cacheable: true };
     
   } catch (error) {
     console.error('❌ Error listando audit logs:', error);
-    return { main: null, backups: [], legacy: null };
+    // El fallback no se guarda en caché
+    return { value: { main: null, backups: [], legacy: null }, cacheable: false };
   }
 }
 
@@ -522,5 +624,6 @@ export default {
   logAuditEntry,
   getAuditLogsForOrder,
   getAuditStats,
-  listAuditLogFiles
+  listAuditLogFiles,
+  __resetAuditCacheForTests
 };

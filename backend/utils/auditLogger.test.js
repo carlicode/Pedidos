@@ -9,14 +9,15 @@ import {
   logAuditEntry,
   getAuditLogsForOrder,
   getAuditStats,
-  listAuditLogFiles
+  listAuditLogFiles,
+  __resetAuditCacheForTests
 } from './auditLogger.js';
 
 // auditLogger lee AUDIT_LOGS_DIR / AUDIT_MAX_BYTES / AUDIT_MAX_FILES en cada llamada,
 // así que cada test usa su propio directorio temporal y sus propios límites.
 let tmpDir;
 const originalEnv = {};
-const ENV_KEYS = ['AUDIT_LOGS_DIR', 'AUDIT_MAX_BYTES', 'AUDIT_MAX_FILES'];
+const ENV_KEYS = ['AUDIT_LOGS_DIR', 'AUDIT_MAX_BYTES', 'AUDIT_MAX_FILES', 'AUDIT_CACHE_TTL_MS'];
 const originalConsoleLog = console.log;
 
 beforeEach(() => {
@@ -25,10 +26,13 @@ beforeEach(() => {
   process.env.AUDIT_LOGS_DIR = tmpDir;
   delete process.env.AUDIT_MAX_BYTES;
   delete process.env.AUDIT_MAX_FILES;
+  delete process.env.AUDIT_CACHE_TTL_MS; // default: caché de 60 s
+  __resetAuditCacheForTests();
   console.log = () => {}; // Silenciar los "✅ [AUDIT]" durante los tests
 });
 
 afterEach(() => {
+  __resetAuditCacheForTests();
   console.log = originalConsoleLog;
   for (const key of ENV_KEYS) {
     if (originalEnv[key] === undefined) delete process.env[key];
@@ -244,4 +248,171 @@ test('5c) sin archivos, los lectores devuelven resultados vacíos sin romper', a
   assert.equal(stats.totalOperations, 0);
   const files = await listAuditLogFiles();
   assert.deepEqual(files, { main: null, backups: [], legacy: null });
+});
+
+// ---------------------------------------------------------------------------
+// Caché con TTL y una sola lectura a la vez (getAuditStats / listAuditLogFiles / getAuditLogsForOrder)
+// ---------------------------------------------------------------------------
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Archivo .jsonl grande (varios MB) para que una lectura tarde lo suficiente como para observarla
+function writeBigJsonl(file, targetBytes) {
+  const line = JSON.stringify({
+    timestamp: '2026-10-12T09:00:00.000Z',
+    action: 'CREAR',
+    orderId: 'big',
+    operator: 'Big',
+    data: { pad: 'p'.repeat(1500) }
+  });
+  const count = Math.ceil(targetBytes / (line.length + 1));
+  fs.writeFileSync(file, Array.from({ length: count }, () => line).join('\n') + '\n');
+  return count;
+}
+
+test('6a) dentro del TTL getAuditStats devuelve lo mismo aunque se escriba una entrada nueva', async () => {
+  await logAuditEntry('CREAR', order('1'));
+
+  const first = await getAuditStats();
+  assert.equal(first.totalOperations, 1);
+
+  await logAuditEntry('CREAR', order('2')); // Entrada nueva entre las dos llamadas
+  const second = await getAuditStats();
+  assert.equal(second, first, 'dentro del TTL debe devolver el mismo resultado cacheado');
+  assert.equal(second.totalOperations, 1);
+
+  // Tras vaciar la caché, la entrada nueva sí aparece
+  __resetAuditCacheForTests();
+  const third = await getAuditStats();
+  assert.equal(third.totalOperations, 2);
+});
+
+test('6a-2) con el TTL vencido getAuditStats vuelve a leer y ve la entrada nueva', async () => {
+  process.env.AUDIT_CACHE_TTL_MS = '30';
+  await logAuditEntry('CREAR', order('1'));
+  const first = await getAuditStats();
+  assert.equal(first.totalOperations, 1);
+
+  await logAuditEntry('CREAR', order('2'));
+  await sleep(60); // TTL vencido
+  const second = await getAuditStats();
+  assert.notEqual(second, first);
+  assert.equal(second.totalOperations, 2);
+});
+
+test('6a-3) listAuditLogFiles también se cachea dentro del TTL', async () => {
+  await logAuditEntry('CREAR', order('1'));
+  const first = await listAuditLogFiles();
+  assert.equal(first.main.entries, 1);
+
+  await logAuditEntry('CREAR', order('2'));
+  assert.equal(await listAuditLogFiles(), first);
+
+  __resetAuditCacheForTests();
+  assert.equal((await listAuditLogFiles()).main.entries, 2);
+});
+
+test('6b) 5 llamadas concurrentes a getAuditStats comparten un solo cálculo y devuelven lo mismo', async () => {
+  for (let i = 1; i <= 3; i++) await logAuditEntry('CREAR', order(String(i)));
+
+  const results = await Promise.all(Array.from({ length: 5 }, () => getAuditStats()));
+  assert.equal(results[0].totalOperations, 3);
+  for (const result of results) {
+    assert.equal(result, results[0], 'todas esperan la misma promesa / el mismo resultado');
+  }
+});
+
+test('6b-2) con TTL=0 las llamadas concurrentes siguen compartiendo el cálculo en curso', async () => {
+  process.env.AUDIT_CACHE_TTL_MS = '0';
+  await logAuditEntry('CREAR', order('1'));
+
+  const results = await Promise.all(Array.from({ length: 5 }, () => getAuditStats()));
+  for (const result of results) assert.equal(result, results[0]);
+});
+
+test('6c) con AUDIT_CACHE_TTL_MS=0 cada llamada ve los datos nuevos', async () => {
+  process.env.AUDIT_CACHE_TTL_MS = '0';
+
+  await logAuditEntry('CREAR', order('1'));
+  const first = await getAuditStats();
+  assert.equal(first.totalOperations, 1);
+
+  await logAuditEntry('CREAR', order('2'));
+  const second = await getAuditStats();
+  assert.equal(second.totalOperations, 2);
+  assert.notEqual(second, first);
+
+  await logAuditEntry('CREAR', order('3'));
+  assert.equal((await listAuditLogFiles()).main.entries, 3);
+  await logAuditEntry('CREAR', order('4'));
+  assert.equal((await listAuditLogFiles()).main.entries, 4);
+});
+
+test('6d) mientras un lector está en curso, logAuditEntry escribe y resuelve sin esperarlo', async () => {
+  process.env.AUDIT_MAX_BYTES = String(1024 * 1024 * 1024); // Que el archivo grande no rote
+  const bigCount = writeBigJsonl(CURRENT(), 25 * 1024 * 1024);
+
+  let readerDone = false;
+  const reader = getAuditStats().then(result => {
+    readerDone = true;
+    return result;
+  });
+
+  const written = await logAuditEntry('CREAR', order('9999'));
+  assert.notEqual(written, null, 'la escritura debe completarse');
+  assert.equal(readerDone, false, 'la escritura no debe esperar a que termine el lector');
+
+  const stats = await reader;
+  assert.ok(stats.totalOperations >= bigCount, 'el lector sí termina');
+
+  const lines = readLines(CURRENT());
+  assert.equal(JSON.parse(lines[lines.length - 1]).orderId, '9999');
+});
+
+test('6e) un error no se guarda en caché (stats devuelve null, files devuelve el fallback)', async () => {
+  // Un archivo regular en el medio del path hace fallar mkdir (ENOTDIR)
+  const blocker = path.join(tmpDir, 'blocker');
+  fs.writeFileSync(blocker, 'no soy un directorio');
+  process.env.AUDIT_LOGS_DIR = path.join(blocker, 'logs');
+
+  const originalError = console.error;
+  console.error = () => {}; // Silenciar los errores esperados
+  try {
+    assert.equal(await getAuditStats(), null);
+    assert.deepEqual(await listAuditLogFiles(), { main: null, backups: [], legacy: null });
+  } finally {
+    console.error = originalError;
+  }
+
+  // Se arregla el problema: la siguiente llamada devuelve datos reales (no el error cacheado)
+  fs.rmSync(blocker);
+  fs.mkdirSync(path.join(blocker, 'logs'), { recursive: true });
+  await logAuditEntry('CREAR', order('1'));
+
+  assert.equal((await getAuditStats()).totalOperations, 1);
+  assert.equal((await listAuditLogFiles()).main.entries, 1);
+});
+
+test('6f) solo una lectura de archivos a la vez entre los tres lectores', async () => {
+  process.env.AUDIT_MAX_BYTES = String(1024 * 1024 * 1024);
+  writeBigJsonl(CURRENT(), 25 * 1024 * 1024);
+  const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-test-empty-'));
+
+  try {
+    // 1) Lector lento sobre el directorio grande (captura su directorio al arrancar)
+    const finished = [];
+    const slow = getAuditStats().then(() => finished.push('stats'));
+    await sleep(5);
+
+    // 2) Otros lectores sobre un directorio VACÍO: sin el límite terminarían casi al instante,
+    //    antes que el lento. Con el límite deben esperar su turno en la cola.
+    process.env.AUDIT_LOGS_DIR = emptyDir;
+    const forOrder = getAuditLogsForOrder('no-existe').then(() => finished.push('order'));
+    const files = listAuditLogFiles().then(() => finished.push('files'));
+    await Promise.all([slow, forOrder, files]);
+
+    assert.deepEqual(finished, ['stats', 'order', 'files']);
+  } finally {
+    fs.rmSync(emptyDir, { recursive: true, force: true });
+  }
 });
