@@ -10,7 +10,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "NODE_ENV=development nodemon index.js"
+    "dev": "NODE_ENV=development nodemon index.js",
+    "test": "node --test utils/*.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.940.0",
