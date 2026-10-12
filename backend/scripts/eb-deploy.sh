@@ -35,8 +35,21 @@ echo -e "${BLUE}📦 Empaquetando código...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 cd backend
-zip -r ../pedidos-backend.zip . -x "*.git*" "node_modules/*" "scripts/*" "test-*" "logs/*"
+# Borrar un zip viejo (zip -r actualiza un zip existente en vez de recrearlo)
+rm -f ../pedidos-backend.zip
+# Excluye secretos locales (.env, credenciales de Google solo para dev) y tests
+zip -r ../pedidos-backend.zip . -x "*.git*" "node_modules/*" "scripts/*" "test-*" "logs/*" \
+    ".env" ".env.*" "*/.env" "*/.env.*" "*beezero-*.json" "*-sa.json" "*.test.js"
 cd ..
+
+# Verificar que el zip NO contiene secretos antes de subirlo
+echo -e "${BLUE}🔎 Verificando que el zip no contenga secretos...${NC}"
+if unzip -l pedidos-backend.zip | grep -E '(^|[ /])\.env(\.[^ /]*)?$|beezero-[^ /]*\.json$|-sa\.json$'; then
+    echo -e "${RED}❌ Error: el zip contiene archivos sensibles (ver arriba). Abortando antes de subir.${NC}"
+    rm -f pedidos-backend.zip
+    exit 1
+fi
+echo -e "${GREEN}✅ El zip no contiene secretos${NC}"
 
 echo -e "${GREEN}✅ Código empaquetado${NC}"
 echo ""
