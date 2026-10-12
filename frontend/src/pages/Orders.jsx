@@ -8,6 +8,7 @@ import NotesFloatingButton from '../components/NotesFloatingButton.jsx'
 import TimerModal from '../components/TimerModal.jsx'
 import CerrarTurnoModal from '../components/CerrarTurnoModal.jsx'
 import ClientInfoModal from '../components/ClientInfoModal.jsx'
+import ClientesInfoManager from '../components/ClientesInfoManager.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import Horarios from './Horarios.jsx'
 import PedidosClientes from '../components/PedidosClientes.jsx'
@@ -182,7 +183,7 @@ export default function Orders() {
   // Estados para Agregar Nuevo
   const [empresasAgregar, setEmpresasAgregar] = useState([])
   const [bikersAgregarNuevo, setBikersAgregarNuevo] = useState([])
-  const [nuevoTipo, setNuevoTipo] = useState('empresa') // 'empresa' o 'biker'
+  const [nuevoTipo, setNuevoTipo] = useState('empresa') // 'empresa' | 'biker' | 'clientes-info'
   const [nuevaEmpresa, setNuevaEmpresa] = useState({
     operador: '',
     empresa: '',
@@ -5685,8 +5686,20 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                 >
                   🚴‍♂️ Agregar Biker
                 </button>
+                <button
+                  type="button"
+                  className={`btn ${nuevoTipo === 'clientes-info' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setNuevoTipo('clientes-info')}
+                >
+                  ℹ️ Info Clientes
+                </button>
             </div>
             </div>
+
+            {/* Info de clientes (DynamoDB) */}
+            {nuevoTipo === 'clientes-info' && (
+              <ClientesInfoManager onNotify={showNotification} />
+            )}
 
             {/* Formulario para Empresa */}
             {nuevoTipo === 'empresa' && (
