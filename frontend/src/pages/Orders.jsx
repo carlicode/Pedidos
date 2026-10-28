@@ -33,9 +33,7 @@ import {
   getBoliviaTimeString, 
   getCurrentBoliviaTime, 
   formatCurrency,
-  toMinutes,
-  mergeTimeSlots,
-  getDayInitial 
+  toMinutes
 } from '../utils/dateUtils.js'
 import {
   saveOrderToSheet,
@@ -279,13 +277,6 @@ export default function Orders() {
   const [pedidosClientesCount, setPedidosClientesCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [isAddingOrder, setIsAddingOrder] = useState(false)
-  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false)
-  const [availabilityLoading, setAvailabilityLoading] = useState(false)
-  const [availabilityData, setAvailabilityData] = useState(null)
-  const [availabilityError, setAvailabilityError] = useState(null)
-  const [availabilityType, setAvailabilityType] = useState('drivers') // 'drivers' o 'bikers'
-  const availabilityFetchedAtRef = useRef(null)
-  
   // Estado para el modal de pedido agregado
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [lastAddedOrder, setLastAddedOrder] = useState(null)
@@ -456,37 +447,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
   
   const SHEET_URL = import.meta.env.VITE_SHEET_WRITE_URL || `${getBackendUrl()}/api/orders`
   const SHEET_TOKEN = import.meta.env.VITE_SHEET_API_KEY || ''
-
-  const handleAvailabilityClick = async (tipo = 'drivers') => {
-    setAvailabilityType(tipo)
-    setShowAvailabilityModal(true)
-    const lastFetched = availabilityFetchedAtRef.current
-    const cacheKey = `${tipo}-${lastFetched}`
-    if (availabilityData && availabilityData.tipo === tipo && lastFetched && (Date.now() - lastFetched) < (2 * 60 * 1000)) {
-      return
-    }
-
-    try {
-      setAvailabilityLoading(true)
-      setAvailabilityError(null)
-      const response = await fetch(getApiUrl(`/api/horarios/disponibilidad-hoy?tipo=${tipo}`))
-      const payload = await response.json()
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error || 'No se pudo obtener la disponibilidad')
-      }
-      setAvailabilityData(payload)
-      availabilityFetchedAtRef.current = Date.now()
-    } catch (error) {
-
-      setAvailabilityError(error.message || 'Error desconocido')
-    } finally {
-      setAvailabilityLoading(false)
-    }
-  }
-
-  const closeAvailabilityModal = () => {
-    setShowAvailabilityModal(false)
-  }
 
   const operadorDefault = useMemo(() => {
     console.log('🔍 [operadorDefault] user:', user)
@@ -3567,42 +3527,39 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
               <h2 style={{ margin: 0 }}>{editingOrder ? `✏️ Editar Pedido #${editingOrder.id}` : 'Nuevo Pedido'}</h2>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                {[
-                  { key: 'drivers', label: 'Drivers', icon: 'calendar' },
-                  { key: 'bikers', label: 'Bikers', icon: 'bike' }
-                ].map(({ key, label, icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleAvailabilityClick(key)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      padding: '12px 24px',
-                      borderRadius: '999px',
-                      border: 'none',
-                      background: '#fbbf24', /* Amarillo aclarado */
-                      color: '#0f172a',
-                      fontWeight: 700,
-                      fontSize: '15px',
-                      cursor: 'pointer',
-                      boxShadow: '0 10px 28px rgba(251, 191, 36, 0.35)', /* Sombra actualizada para amarillo aclarado */
-                      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)'
-                      e.currentTarget.style.boxShadow = '0 14px 32px rgba(251, 191, 36, 0.45)' /* Sombra actualizada */
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 10px 28px rgba(251, 191, 36, 0.35)' /* Sombra actualizada */
-                    }}
-                  >
-                    <Icon name={icon} size={18} />
-                    Disponibilidad {label}
-                  </button>
-                ))}
+                <a
+                  href="/monitor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px 24px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    background: '#fbbf24', /* Amarillo aclarado */
+                    color: '#0f172a',
+                    fontWeight: 700,
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 28px rgba(251, 191, 36, 0.35)', /* Sombra actualizada para amarillo aclarado */
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    textDecoration: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 14px 32px rgba(251, 191, 36, 0.45)' /* Sombra actualizada */
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 10px 28px rgba(251, 191, 36, 0.35)' /* Sombra actualizada */
+                  }}
+                >
+                  <Icon name="activity" size={18} />
+                  Monitor
+                  <Icon name="external-link" size={16} />
+                </a>
               </div>
             </div>
             
@@ -7839,209 +7796,6 @@ const [busquedaBiker, setBusquedaBiker] = useState('')
                 Entendido
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      
-      {showAvailabilityModal && (
-        <div
-          className="modal-overlay"
-          style={{ backdropFilter: 'blur(3px)' }}
-          onClick={closeAvailabilityModal}
-        >
-          <div
-            className="modal-content"
-            style={{
-              maxWidth: '960px',
-              width: '90%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: '20px',
-              padding: '32px',
-              background: '#f8fafc'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#0f172a' }}>
-                  <Icon name="calendar" size={24} />
-                  <h3 style={{ margin: 0, fontSize: '22px' }}>Disponibilidad de hoy · {availabilityData?.label || (availabilityType === 'drivers' ? 'Drivers' : 'Bikers')}</h3>
-                </div>
-                <p style={{ marginTop: '6px', marginBottom: 0, color: '#475569', fontSize: '14px' }}>
-                  {availabilityData?.day
-                    ? new Date(availabilityData.date).toLocaleDateString('es-BO', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long'
-                      })
-                    : 'Revisando horarios en Google Sheets...'}
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('horarios')
-                    closeAvailabilityModal()
-                  }}
-                  style={{
-                    border: '1px solid #cbd5f5',
-                    background: '#fff',
-                    color: '#0f172a',
-                    borderRadius: '999px',
-                    padding: '10px 18px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Ver todo el módulo
-                </button>
-                <button
-                  type="button"
-                  onClick={closeAvailabilityModal}
-                  style={{
-                    border: 'none',
-                    background: '#0f172a',
-                    color: '#fff',
-                    borderRadius: '999px',
-                    padding: '10px 18px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-
-            {availabilityLoading && (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#475569' }}>
-                <div style={{ fontSize: '42px', marginBottom: '12px' }}>🔄</div>
-                Consultando Google Sheets...
-              </div>
-            )}
-
-            {!availabilityLoading && availabilityError && (
-              <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '12px', padding: '24px', color: '#991b1b' }}>
-                <strong>Ups!</strong> {availabilityError}
-              </div>
-            )}
-
-            {!availabilityLoading && !availabilityError && (
-              (() => {
-                const drivers = (availabilityData?.drivers || []).filter(driver => driver.worksToday && (driver.slotsToday?.length || driver.autoToday))
-                if (!drivers.length) {
-                  return (
-                    <div style={{ textAlign: 'center', padding: '40px', background: '#fff', borderRadius: '16px', border: '1px dashed #cbd5f5' }}>
-                      <Icon name="alert-triangle" size={32} color="#f97316" />
-                      <p style={{ marginTop: '12px', color: '#475569' }}>
-                        No encontramos horarios con "X" para hoy. Pide a los {availabilityData?.label?.toLowerCase() || (availabilityType === 'drivers' ? 'drivers' : 'bikers')} que actualicen el sheet.
-                      </p>
-                    </div>
-                  )
-                }
-
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
-                    {drivers.map((driver) => (
-                      <div
-                        key={driver.driver}
-                        style={{
-                          background: '#fff',
-                          borderRadius: '18px',
-                          padding: '20px',
-                          border: '1px solid #e2e8f0',
-                          boxShadow: '0 12px 20px rgba(15, 23, 42, 0.08)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                          <div>
-                            <p style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>{driver.driver}</p>
-                            <small style={{ color: '#64748b' }}>{driver.autoToday ? `Auto: ${driver.autoToday}` : 'Sin auto asignado'}</small>
-                          </div>
-                          <span
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '999px',
-                              background: driver.availableNow ? '#dcfce7' : '#fef3c7',
-                              color: driver.availableNow ? '#166534' : '#a16207',
-                              fontWeight: 600,
-                              fontSize: '12px',
-                              alignSelf: 'flex-start',
-                              display: 'inline-flex',
-                              flexDirection: driver.availableNow ? 'row' : 'column',
-                              gap: driver.availableNow ? '0' : '2px',
-                              textAlign: 'center',
-                              lineHeight: driver.availableNow ? '1' : '1.1',
-                              minWidth: driver.availableNow ? undefined : '72px',
-                              justifyContent: 'center'
-                            }}
-                          >
-                            {driver.availableNow ? (
-                              'Disponible ahora'
-                            ) : driver.nextSlot ? (
-                              <>
-                                <span style={{ fontSize: '10px', letterSpacing: '0.5px' }}>Desde</span>
-                                <span style={{ fontSize: '13px', fontWeight: 700 }}>{driver.nextSlot}</span>
-                              </>
-                            ) : (
-                              'Sin turnos pendientes'
-                            )}
-                          </span>
-                        </div>
-
-                        {driver.workingDays?.length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                            {driver.workingDays.map(day => (
-                              <span
-                                key={`${driver.driver}-${day}`}
-                                style={{
-                                  padding: '4px 10px',
-                                  borderRadius: '999px',
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  background: day === availabilityData?.day ? '#e0f2fe' : '#f1f5f9',
-                                  color: '#0f172a'
-                                }}
-                              >
-                                {getDayInitial(day)}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {driver.slotsToday?.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {mergeTimeSlots(driver.slotsToday).map(slot => (
-                              <span
-                                key={`${driver.driver}-${slot}`}
-                                style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '10px',
-                                  background: '#f8fafc',
-                                  border: '1px solid #e2e8f0',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  color: '#0f172a'
-                                }}
-                              >
-                                {slot}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px' }}>El calendario indica que hoy descansa.</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()
-            )}
           </div>
         </div>
       )}

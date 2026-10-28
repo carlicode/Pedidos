@@ -10,6 +10,7 @@ import Horarios from './pages/Horarios.jsx'
 import InventarioAdmin from './pages/InventarioAdmin.jsx'
 import Unauthorized from './pages/Unauthorized.jsx'
 import Notes from './pages/Notes.jsx'
+import Monitor from './pages/Monitor.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import Icon from './components/Icon.jsx'
 import { useAuth } from './hooks/useAuth.js'
@@ -165,6 +166,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Notes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/monitor"
+            element={
+              <ProtectedRoute>
+                <Monitor />
               </ProtectedRoute>
             }
           />

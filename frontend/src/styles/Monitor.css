@@ -1,0 +1,316 @@
+/* Página /monitor - turnos de hoy. Compatible con modo oscuro.
+   Usa las variables de styles.css (--text, --card-bg, ...), que cambian solas con
+   [data-theme="dark"]. Las píldoras y los colores de estado son propios y están
+   definidos dos veces (claro y oscuro). Todas las clases llevan prefijo monitor-. */
+
+.monitor-pagina {
+  --monitor-verde-bg: #dcfce7;
+  --monitor-verde-texto: #166534;
+  --monitor-azul-bg: #dbeafe;
+  --monitor-azul-texto: #1e40af;
+  --monitor-gris-bg: #e2e8f0;
+  --monitor-gris-texto: #334155;
+  --monitor-verde-numero: #15803d;
+  --monitor-punto: #16a34a;
+  --monitor-aviso-bg: #f1f5f9;
+  --monitor-aviso-texto: #334155;
+
+  width: 100%;
+  max-width: var(--max-width, 1200px);
+  margin: 0 auto;
+  padding: 20px 16px;
+  color: var(--text);
+}
+
+[data-theme="dark"] .monitor-pagina {
+  --monitor-verde-bg: #14532d;
+  --monitor-verde-texto: #bbf7d0;
+  --monitor-azul-bg: #1e3a8a;
+  --monitor-azul-texto: #bfdbfe;
+  --monitor-gris-bg: #334155;
+  --monitor-gris-texto: #e2e8f0;
+  --monitor-verde-numero: #4ade80;
+  --monitor-punto: #4ade80;
+  --monitor-aviso-bg: #334155;
+  --monitor-aviso-texto: #e2e8f0;
+}
+
+/* Cabecera */
+.monitor-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.monitor-cabecera-texto {
+  min-width: 0;
+}
+
+.monitor-titulo {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.monitor-subtitulo {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.monitor-envivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.monitor-envivo-punto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--monitor-punto);
+  flex-shrink: 0;
+}
+
+/* Mensajes y avisos */
+.monitor-mensaje {
+  margin: 24px 0;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-secondary);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.monitor-aviso {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--monitor-aviso-texto);
+  background: var(--monitor-aviso-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+/* Contadores */
+.monitor-contadores {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.monitor-contador {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  min-width: 0;
+}
+
+.monitor-contador-valor {
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.monitor-contador-verde .monitor-contador-valor {
+  color: var(--monitor-verde-numero);
+}
+
+.monitor-contador-etiqueta {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Columnas */
+.monitor-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.monitor-columna {
+  min-width: 0;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.monitor-columna-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.monitor-columna-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.monitor-columna-programados {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.monitor-grupo {
+  margin-top: 14px;
+}
+
+.monitor-grupo-titulo {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.monitor-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Fila de persona */
+.monitor-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.monitor-fila:first-child {
+  border-top: none;
+}
+
+.monitor-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-tertiary);
+}
+
+.monitor-fila-texto {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.monitor-nombre {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.monitor-detalle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* Píldoras: verde, azul y gris. Todavía no existen rojo ni ámbar. */
+.monitor-pildora {
+  flex-shrink: 0;
+  max-width: 45%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monitor-pildora-verde {
+  background: var(--monitor-verde-bg);
+  color: var(--monitor-verde-texto);
+}
+
+.monitor-pildora-azul {
+  background: var(--monitor-azul-bg);
+  color: var(--monitor-azul-texto);
+}
+
+.monitor-pildora-gris {
+  background: var(--monitor-gris-bg);
+  color: var(--monitor-gris-texto);
+}
+
+[data-theme="dark"] .monitor-pildora-verde {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+[data-theme="dark"] .monitor-pildora-azul {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+[data-theme="dark"] .monitor-pildora-gris {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.monitor-pie {
+  margin: 20px 0 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* Móvil */
+@media (max-width: 600px) {
+  .monitor-pagina {
+    padding: 12px 10px;
+  }
+
+  .monitor-titulo {
+    font-size: 22px;
+  }
+
+  .monitor-contadores {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .monitor-columna {
+    padding: 12px;
+  }
+}
