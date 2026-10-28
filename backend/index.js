@@ -192,7 +192,7 @@ import notesRoutes from './routes/notes.js'
 import clientInfoRoutes from './routes/clientInfo.js'
 import clientesInfoRoutes from './routes/clientesInfo.js'
 import monitorRoutes from './routes/monitor.js'
-import { verifyToken } from './middleware/auth.js'
+import { verifyToken, requireAdminOrOperador } from './middleware/auth.js'
 
 // Importar funciones para obtener secretos de AWS
 import { getSecrets } from './utils/secrets.js'
@@ -329,8 +329,8 @@ app.use('/api/client-info', clientInfoRoutes)
 // CRUD de info de clientes en DynamoDB (requiere JWT)
 app.use('/api/clientes-info', verifyToken, clientesInfoRoutes)
 
-// Monitor de turnos (proxy a Turbo; requiere JWT)
-app.use('/api/monitor', verifyToken, monitorRoutes)
+// Monitor de turnos (proxy a Turbo; requiere JWT y rol admin u operador)
+app.use('/api/monitor', verifyToken, requireAdminOrOperador, monitorRoutes)
 
 // Health check endpoints
 import { healthCheck, readinessCheck, livenessCheck } from './utils/healthCheck.js'

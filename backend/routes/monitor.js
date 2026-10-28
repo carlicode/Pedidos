@@ -2,8 +2,9 @@ import express from 'express'
 import { obtenerMonitorHoy } from '../services/turboMonitor.js'
 
 /**
- * Monitor de turnos: proxy a Turbo. Montado en index.js con verifyToken:
- * app.use('/api/monitor', verifyToken, monitorRoutes)
+ * Monitor de turnos: proxy a Turbo. Montado en index.js con verifyToken y rol
+ * admin u operador (expone nombres, horarios y lugares de inicio de turno):
+ * app.use('/api/monitor', verifyToken, requireAdminOrOperador, monitorRoutes)
  *
  * No toca Sheets ni DynamoDB. Los detalles del fallo (códigos internos) no se
  * devuelven al cliente.
