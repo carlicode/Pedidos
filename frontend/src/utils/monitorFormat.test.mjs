@@ -11,6 +11,9 @@ import {
   ahoraBoliviaMin,
   horaBolivia,
   fechaLarga,
+  normalizarBusqueda,
+  filtrarPorNombre,
+  datosTarjeta,
 } from './monitorFormat.mjs'
 
 // ---------- fusionarFranjas ----------
@@ -136,6 +139,10 @@ test('grupoDe: trabajando + sin-candidato → trabajando', () => {
   assert.equal(grupoDe({ estado: 'trabajando', vinculo: 'sin-candidato' }), 'trabajando')
 })
 
+test('grupoDe: fuera-de-horario (turno abierto sin estar en el horario) → trabajando', () => {
+  assert.equal(grupoDe({ estado: 'fuera-de-horario', vinculo: 'sin-horario' }), 'trabajando')
+})
+
 // ---------- ordenarGrupo ----------
 
 test('ordenarGrupo: por hora del primer bloque, luego nombre; sin bloques al final; no muta', () => {
@@ -152,7 +159,7 @@ test('ordenarGrupo: por hora del primer bloque, luego nombre; sin bloques al fin
 
 // ---------- contadores ----------
 
-test('contadores: los sin-vincular no suman a sinIniciar; suma drivers + bikers', () => {
+test('contadores: los sin-vincular no suman a sinIniciar; fuera-de-horario cuenta como trabajando; suma drivers + bikers', () => {
   const drivers = [
     { estado: 'trabajando', vinculo: 'manual' },
     { estado: 'sin-iniciar', vinculo: 'manual' },
@@ -167,7 +174,7 @@ test('contadores: los sin-vincular no suman a sinIniciar; suma drivers + bikers'
     { estado: 'termino', vinculo: 'auto' },
   ]
   assert.deepEqual(contadores(drivers, bikers), {
-    trabajando: 2,
+    trabajando: 3, // 2 trabajando + 1 fuera-de-horario
     sinIniciar: 1,
     porLlegar: 1,
     terminaron: 2,
@@ -211,4 +218,80 @@ test('fechaLarga: 2026-10-28 → miércoles 28 de octubre', () => {
   assert.equal(fechaLarga('2026-10-28'), 'miércoles 28 de octubre')
   assert.equal(fechaLarga('2026-01-01'), 'jueves 1 de enero')
   assert.equal(fechaLarga('basura'), '')
+})
+
+// ---------- búsqueda por nombre ----------
+
+test('normalizarBusqueda: sin tildes, minúsculas y espacios colapsados', () => {
+  assert.equal(normalizarBusqueda('  José   PÉREZ '), 'jose perez')
+  assert.equal(normalizarBusqueda(undefined), '')
+})
+
+test('filtrarPorNombre: ignora mayúsculas y tildes', () => {
+  const lista = [{ nombre: 'William Montaño Bee Zero' }, { nombre: 'Ana Gómez' }]
+  assert.deepEqual(filtrarPorNombre(lista, 'MONTANO').map((p) => p.nombre), ['William Montaño Bee Zero'])
+  assert.deepEqual(filtrarPorNombre(lista, 'gomez').map((p) => p.nombre), ['Ana Gómez'])
+})
+
+test('filtrarPorNombre: varias palabras en cualquier orden', () => {
+  const lista = [{ nombre: 'Juan Carlos Mamani Quispe' }, { nombre: 'Juan Pérez' }]
+  assert.deepEqual(filtrarPorNombre(lista, 'quispe juan').map((p) => p.nombre), ['Juan Carlos Mamani Quispe'])
+})
+
+test('filtrarPorNombre: el sufijo " Bee Zero" no cuenta como parte del nombre', () => {
+  const lista = [{ nombre: 'Fabricio Rodriguez Bee Zero' }, { nombre: 'Ana Gómez' }]
+  assert.deepEqual(filtrarPorNombre(lista, 'bee zero'), [])
+})
+
+test('filtrarPorNombre: búsqueda vacía devuelve todo, sin mutar la entrada', () => {
+  const lista = [{ nombre: 'A' }, { nombre: 'B' }]
+  const copia = JSON.parse(JSON.stringify(lista))
+  assert.equal(filtrarPorNombre(lista, '   ').length, 2)
+  assert.equal(filtrarPorNombre(null, 'x').length, 0)
+  filtrarPorNombre(lista, 'a')
+  assert.deepEqual(lista, copia)
+})
+
+// ---------- datosTarjeta ----------
+
+test('datosTarjeta: trabajando con dos franjas, hora de inicio y placa del turno', () => {
+  const persona = {
+    bloques: [{ desde: '16:00', hasta: '22:00' }, { desde: '06:00', hasta: '14:00' }],
+    turno: { horaInicio: '05:49', horaFin: null, lugarInicio: 'Chuquisaca 0673 Noroeste', placa: '7276 DUX' },
+  }
+  assert.deepEqual(datosTarjeta(persona, 'trabajando'), {
+    franjas: ['06:00-14:00', '16:00-22:00'],
+    inicio: '05:49',
+    placa: '7276 DUX',
+  })
+})
+
+test('datosTarjeta: sin turno usa la placa del horario y deja lo demás en null', () => {
+  const persona = { bloques: [{ desde: '06:00', hasta: '10:00', placa: '1234 ABC' }, { desde: '10:00', hasta: '12:00', placa: '1234 ABC' }], turno: null }
+  assert.deepEqual(datosTarjeta(persona, 'por-llegar'), {
+    franjas: ['06:00-12:00'],
+    inicio: null,
+    placa: '1234 ABC',
+  })
+})
+
+test('datosTarjeta: la placa del turno gana sobre la del horario', () => {
+  const persona = { bloques: [{ desde: '06:00', hasta: '12:00', placa: 'HORARIO' }], turno: { horaInicio: '06:00', placa: 'TURNO', lugarInicio: null } }
+  assert.equal(datosTarjeta(persona, 'trabajando').placa, 'TURNO')
+})
+
+test('datosTarjeta: sin-vincular muestra solo horario (ignora el turno)', () => {
+  const persona = { bloques: [{ desde: '06:00', hasta: '14:00' }], turno: { horaInicio: '06:10', lugarInicio: 'Algún lugar', placa: 'XYZ' } }
+  assert.deepEqual(datosTarjeta(persona, 'sin-vincular'), {
+    franjas: ['06:00-14:00'],
+    inicio: null,
+    placa: null,
+  })
+})
+
+test('datosTarjeta: persona sin horario ni turno → todo vacío', () => {
+  assert.deepEqual(datosTarjeta({ bloques: [], turno: null }, 'fuera-de-horario'), {
+    franjas: [], inicio: null, placa: null,
+  })
+  assert.deepEqual(datosTarjeta(undefined, 'x'), { franjas: [], inicio: null, placa: null })
 })

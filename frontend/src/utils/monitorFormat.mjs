@@ -57,16 +57,39 @@ export function textoHorario(bloques) {
     .join(', ')
 }
 
+/**
+ * Campos que se muestran en la tarjeta de una persona. Solo trae lo que existe:
+ *   franjas: ['06:00-14:00', '16:00-22:00']   (ya fusionadas; vacío si no hay horario)
+ *   inicio:  '05:49' | null                   (hora a la que empezó el turno)
+ *   placa:   '7276 DUX' | null                (la del turno; si no hay, la del horario)
+ * Las personas 'sin-vincular' solo muestran horario (y placa del horario, si la hay):
+ * su turno, si existiera, no es confiable porque no se sabe con qué cuenta trabajan.
+ */
+export function datosTarjeta(persona, grupo) {
+  const fusionadas = fusionarFranjas(persona?.bloques)
+  const turno = grupo === 'sin-vincular' ? null : persona?.turno
+  const placasHorario = [...new Set(fusionadas.flatMap((f) => f.placas))].join(', ')
+  return {
+    franjas: fusionadas.map((f) => `${f.desde}-${f.hasta}`),
+    inicio: turno?.horaInicio || null,
+    placa: turno?.placa || placasHorario || null,
+  }
+}
+
 /** Quita un sufijo final ' Bee Zero' (sin importar mayúsculas). */
 export function nombreVisible(nombre) {
   return String(nombre ?? '').trim().replace(/\s+bee zero$/i, '').trim()
 }
 
 /**
- * Grupo en el que se muestra la persona. Un 'sin-iniciar' que no se pudo
- * vincular a una cuenta es 'sin-vincular' (puede estar trabajando con otra cuenta).
+ * Grupo en el que se muestra la persona.
+ *  - 'fuera-de-horario' es alguien con turno abierto que no figura en el horario de hoy:
+ *    está trabajando, así que va con los 'trabajando'.
+ *  - Un 'sin-iniciar' que no se pudo vincular a una cuenta es 'sin-vincular'
+ *    (puede estar trabajando con otra cuenta).
  */
 export function grupoDe(persona) {
+  if (persona?.estado === 'fuera-de-horario') return 'trabajando'
   if (
     persona?.estado === 'sin-iniciar'
     && (persona?.vinculo === 'sin-candidato' || persona?.vinculo === 'ambiguo')
@@ -91,7 +114,7 @@ export function ordenarGrupo(lista) {
   })
 }
 
-/** Totales sumando ambas listas. 'sin-vincular' y 'fuera-de-horario' no suman a sinIniciar. */
+/** Totales sumando ambas listas. 'fuera-de-horario' cuenta como trabajando; 'sin-vincular' no suma a sinIniciar. */
 export function contadores(drivers, bikers) {
   const total = { trabajando: 0, sinIniciar: 0, porLlegar: 0, terminaron: 0 }
   for (const p of [...(drivers || []), ...(bikers || [])]) {
@@ -136,6 +159,31 @@ export function horaBolivia(isoUtc) {
   if (Number.isNaN(date.getTime())) return ''
   const min = minutosBoliviaDeDate(date)
   return `${dosDigitos(Math.floor(min / 60))}:${dosDigitos(min % 60)}`
+}
+
+/** Minúsculas, sin tildes y con espacios colapsados: 'José  PÉREZ' → 'jose perez'. */
+export function normalizarBusqueda(texto) {
+  return String(texto ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Filtra personas por nombre. Cada palabra de la búsqueda debe aparecer en el nombre
+ * (en cualquier orden), sin importar mayúsculas ni tildes. Se busca sobre el nombre
+ * visible, así que escribir "bee zero" no coincide con todos. Búsqueda vacía: devuelve todo.
+ * No muta la entrada.
+ */
+export function filtrarPorNombre(lista, consulta) {
+  const palabras = normalizarBusqueda(consulta).split(' ').filter(Boolean)
+  if (palabras.length === 0) return [...(lista || [])]
+  return (lista || []).filter((persona) => {
+    const nombre = normalizarBusqueda(nombreVisible(persona?.nombre))
+    return palabras.every((p) => nombre.includes(p))
+  })
 }
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']

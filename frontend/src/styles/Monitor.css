@@ -110,27 +110,127 @@
   margin-bottom: 20px;
 }
 
+/* Cada tarjeta lleva un acento de color (borde izquierdo, fondo suave y número). */
 .monitor-contador {
+  --monitor-acento: #94a3b8;
+  --monitor-fondo: #f8fafc;
+  --monitor-numero: var(--text);
+
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
+  width: 100%;
   padding: 14px 16px;
-  background: var(--card-bg);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: var(--monitor-fondo);
   border: 1px solid var(--border);
+  border-left: 4px solid var(--monitor-acento);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
   min-width: 0;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.monitor-contador:hover {
+  transform: translateY(-1px);
+}
+
+.monitor-contador:focus-visible {
+  outline: 2px solid var(--monitor-acento);
+  outline-offset: 2px;
+}
+
+/* El contador seleccionado manda: es el que define qué se ve abajo */
+.monitor-contador-activo {
+  border-color: var(--monitor-acento);
+  box-shadow: 0 0 0 2px var(--monitor-acento), var(--shadow-sm);
 }
 
 .monitor-contador-valor {
   font-size: 28px;
   line-height: 1.1;
   font-weight: 700;
+  color: var(--monitor-numero);
+}
+
+.monitor-contador-verde { --monitor-acento: #16a34a; --monitor-fondo: #f0fdf4; --monitor-numero: #15803d; }
+.monitor-contador-gris { --monitor-acento: #94a3b8; --monitor-fondo: #f8fafc; --monitor-numero: #334155; }
+.monitor-contador-azul { --monitor-acento: #3b82f6; --monitor-fondo: #eff6ff; --monitor-numero: #1d4ed8; }
+.monitor-contador-violeta { --monitor-acento: #8b5cf6; --monitor-fondo: #f5f3ff; --monitor-numero: #6d28d9; }
+
+[data-theme="dark"] .monitor-contador-verde { --monitor-acento: #4ade80; --monitor-fondo: rgba(74, 222, 128, 0.1); --monitor-numero: #4ade80; }
+[data-theme="dark"] .monitor-contador-gris { --monitor-acento: #94a3b8; --monitor-fondo: rgba(148, 163, 184, 0.1); --monitor-numero: #e2e8f0; }
+[data-theme="dark"] .monitor-contador-azul { --monitor-acento: #60a5fa; --monitor-fondo: rgba(96, 165, 250, 0.12); --monitor-numero: #93c5fd; }
+[data-theme="dark"] .monitor-contador-violeta { --monitor-acento: #a78bfa; --monitor-fondo: rgba(167, 139, 250, 0.12); --monitor-numero: #c4b5fd; }
+
+/* Buscador por nombre */
+.monitor-buscador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.monitor-buscador-icono {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.monitor-buscador-input {
+  width: 100%;
+  padding: 11px 40px 11px 38px;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.monitor-buscador-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.monitor-buscador-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.monitor-buscador-limpiar {
+  position: absolute;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.monitor-buscador-limpiar:hover {
   color: var(--text);
 }
 
-.monitor-contador-verde .monitor-contador-valor {
-  color: var(--monitor-verde-numero);
+.monitor-ayuda {
+  margin: -8px 0 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .monitor-contador-etiqueta {
@@ -147,12 +247,42 @@
 }
 
 .monitor-columna {
+  --monitor-col-acento: #94a3b8;
+  --monitor-col-fondo: #e2e8f0;
+  --monitor-col-icono: #334155;
+
   min-width: 0;
   padding: 16px;
   background: var(--card-bg);
   border: 1px solid var(--border);
+  border-top: 4px solid var(--monitor-col-acento);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
+}
+
+/* Drivers: amarillo. Bikers: verde. (Solo identifica la columna; no es un estado.) */
+.monitor-columna-drivers { --monitor-col-acento: #f59e0b; --monitor-col-fondo: #fef3c7; --monitor-col-icono: #b45309; }
+.monitor-columna-bikers { --monitor-col-acento: #059669; --monitor-col-fondo: #d1fae5; --monitor-col-icono: #047857; }
+
+[data-theme="dark"] .monitor-columna-drivers { --monitor-col-acento: #fbbf24; --monitor-col-fondo: rgba(251, 191, 36, 0.16); --monitor-col-icono: #fcd34d; }
+[data-theme="dark"] .monitor-columna-bikers { --monitor-col-acento: #34d399; --monitor-col-fondo: rgba(52, 211, 153, 0.16); --monitor-col-icono: #6ee7b7; }
+
+.monitor-columna-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--monitor-col-icono);
+  background: var(--monitor-col-fondo);
+}
+
+.monitor-columna-vacia {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 
 .monitor-columna-cabecera {
@@ -184,6 +314,9 @@
 }
 
 .monitor-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0 0 6px;
   font-size: 12px;
   font-weight: 700;
@@ -192,23 +325,181 @@
   color: var(--text-secondary);
 }
 
+/* Puntito de color por grupo, en la misma paleta de las píldoras */
+.monitor-grupo-titulo::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.monitor-grupo-trabajando .monitor-grupo-titulo::before { background: #16a34a; }
+.monitor-grupo-por-llegar .monitor-grupo-titulo::before { background: #3b82f6; }
+.monitor-grupo-termino .monitor-grupo-titulo::before { background: #8b5cf6; }
+.monitor-grupo-sin-vincular .monitor-grupo-titulo::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px #64748b;
+}
+
+[data-theme="dark"] .monitor-grupo-trabajando .monitor-grupo-titulo::before { background: #4ade80; }
+[data-theme="dark"] .monitor-grupo-por-llegar .monitor-grupo-titulo::before { background: #60a5fa; }
+[data-theme="dark"] .monitor-grupo-termino .monitor-grupo-titulo::before { background: #a78bfa; }
+[data-theme="dark"] .monitor-grupo-sin-vincular .monitor-grupo-titulo::before { box-shadow: inset 0 0 0 2px #94a3b8; }
+
 .monitor-lista {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* Fila de persona */
-.monitor-fila {
+/* Tarjeta de persona: cabecera (avatar, nombre, estado) y datos con etiqueta */
+.monitor-tarjeta {
+  --monitor-tono: #94a3b8;
+  --monitor-tarjeta-bg: #f8fafc;
+  --monitor-chip-bg: #ffffff;
+  --monitor-chip-borde: #cbd5e1;
+  --monitor-placa-bg: #ffffff;
+  --monitor-placa-borde: #64748b;
+  --monitor-placa-texto: #0f172a;
+
+  padding: 12px;
+  background: var(--monitor-tarjeta-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--monitor-tono);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.monitor-tarjeta-verde { --monitor-tono: #16a34a; }
+.monitor-tarjeta-azul { --monitor-tono: #3b82f6; }
+.monitor-tarjeta-gris { --monitor-tono: #94a3b8; }
+
+[data-theme="dark"] .monitor-tarjeta {
+  --monitor-tarjeta-bg: rgba(15, 23, 42, 0.45);
+  --monitor-chip-bg: #1e293b;
+  --monitor-chip-borde: rgba(148, 163, 184, 0.35);
+  --monitor-placa-bg: #1e293b;
+  --monitor-placa-borde: #94a3b8;
+  --monitor-placa-texto: #f8fafc;
+}
+
+[data-theme="dark"] .monitor-tarjeta-verde { --monitor-tono: #4ade80; }
+[data-theme="dark"] .monitor-tarjeta-azul { --monitor-tono: #60a5fa; }
+[data-theme="dark"] .monitor-tarjeta-gris { --monitor-tono: #94a3b8; }
+
+.monitor-tarjeta-cabecera {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
-  border-top: 1px solid var(--border);
 }
 
-.monitor-fila:first-child {
-  border-top: none;
+/* Cuando la tarjeta tiene datos, la cabecera es un botón que la abre y la cierra */
+.monitor-tarjeta-boton {
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: 8px;
+}
+
+.monitor-tarjeta-boton:focus-visible {
+  outline: 2px solid var(--monitor-tono);
+  outline-offset: 3px;
+}
+
+.monitor-flecha {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin: 0 4px 3px 2px;
+  border-right: 2px solid var(--text-secondary);
+  border-bottom: 2px solid var(--text-secondary);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.monitor-tarjeta-abierta .monitor-flecha {
+  margin-bottom: -3px;
+  transform: rotate(-135deg);
+}
+
+.monitor-tarjeta-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-strong);
+}
+
+.monitor-dato {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.monitor-dato-ancho {
+  grid-column: 1 / -1;
+}
+
+.monitor-dato-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.monitor-dato-valor {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-franjas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.monitor-franja {
+  padding: 2px 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--monitor-chip-bg);
+  border: 1px solid var(--monitor-chip-borde);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La placa se ve como una placa */
+.monitor-placa {
+  padding: 1px 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--monitor-placa-texto);
+  background: var(--monitor-placa-bg);
+  border: 1.5px solid var(--monitor-placa-borde);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
 }
 
 .monitor-avatar {
@@ -225,23 +516,17 @@
   background: var(--bg-tertiary);
 }
 
-.monitor-fila-texto {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-width: 0;
-}
+/* El avatar toma el color de la píldora de la persona */
+.monitor-avatar-verde { color: var(--monitor-verde-texto); background: var(--monitor-verde-bg); }
+.monitor-avatar-azul { color: var(--monitor-azul-texto); background: var(--monitor-azul-bg); }
+.monitor-avatar-gris { color: var(--monitor-gris-texto); background: var(--monitor-gris-bg); }
 
 .monitor-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
-  overflow-wrap: anywhere;
-}
-
-.monitor-detalle {
-  font-size: 12px;
-  color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
 
